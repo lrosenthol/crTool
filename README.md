@@ -40,6 +40,8 @@ parent-directory/
 └── c2pa-rs/              (c2pa-rs SDK)
 ```
 
+**Note for CI/CD**: The GitHub Actions CI workflow automatically checks out the c2pa-rs repository as a sibling directory, so the path dependency will work correctly in CI environments.
+
 ## Usage
 
 ### Basic Command Structure
@@ -213,7 +215,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Resources
 
-- [C2PA Specification](https://c2pa.org/specifications/specifications/1.0/index.html)
+- [C2PA Specification](https://c2pa.org/specifications/specifications/2.2/index.html)
 - [c2pa-rs Documentation](https://docs.rs/c2pa/)
 - [Content Authenticity Initiative](https://contentauthenticity.org/)
 
