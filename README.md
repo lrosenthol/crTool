@@ -19,13 +19,26 @@ A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/conten
 
 ### Building from Source
 
+**Important**: This project depends on a local copy of the c2pa-rs library. The `Cargo.toml` references it via a relative path.
+
 ```bash
-git clone <repository-url>
+# Clone both repositories as siblings
+git clone https://github.com/lrosenthol/c2pa-testfile-maker.git
+git clone https://github.com/contentauth/c2pa-rs.git
+
+# Build the project
 cd c2pa-testfile-maker
 cargo build --release
 ```
 
 The compiled binary will be available at `target/release/c2pa-testfile-maker`.
+
+**Directory Structure Required:**
+```
+parent-directory/
+├── c2pa-testfile-maker/  (this repository)
+└── c2pa-rs/              (c2pa-rs SDK)
+```
 
 ## Usage
 
