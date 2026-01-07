@@ -73,8 +73,7 @@ fn create_callback_signer(
     // Create the callback signer based on the algorithm
     let signer = match signing_alg {
         SigningAlg::Ed25519 => {
-            let ed_signer =
-                move |_context: *const (), data: &[u8]| ed25519_sign(data, &key_data);
+            let ed_signer = move |_context: *const (), data: &[u8]| ed25519_sign(data, &key_data);
             CallbackSigner::new(ed_signer, signing_alg, cert_data)
         }
         SigningAlg::Es256 | SigningAlg::Es384 | SigningAlg::Es512 => {
@@ -133,8 +132,8 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     use pem::parse;
     use rsa::pkcs1v15::SigningKey;
     use rsa::pkcs8::DecodePrivateKey;
-    use rsa::signature::{Signer, SignatureEncoding};
     use rsa::sha2::Sha256;
+    use rsa::signature::{SignatureEncoding, Signer};
     use rsa::RsaPrivateKey;
 
     // Parse the PEM data to get the private key
@@ -194,9 +193,8 @@ fn main() -> Result<()> {
     // Sign and embed the manifest into the asset
     if cli.allow_self_signed {
         // Use callback signer that bypasses certificate validation
-        let signer =
-            create_callback_signer(&cli.cert, &cli.key, signing_alg)
-                .context("Failed to create callback signer")?;
+        let signer = create_callback_signer(&cli.cert, &cli.key, signing_alg)
+            .context("Failed to create callback signer")?;
         builder
             .sign_file(&signer, &cli.input, &output_path)
             .context("Failed to sign and embed manifest")?;
