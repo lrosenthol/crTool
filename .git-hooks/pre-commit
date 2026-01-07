@@ -1,0 +1,40 @@
+#!/bin/bash
+# Pre-commit hook for Rust projects
+# Runs cargo fmt and cargo clippy before allowing commits
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# Check if cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "Error: cargo not found. Please install Rust."
+    exit 1
+fi
+
+# Run cargo fmt check
+echo "→ Checking code formatting..."
+if ! cargo fmt -- --check; then
+    echo ""
+    echo "❌ Code formatting check failed!"
+    echo "   Run 'cargo fmt' to fix formatting issues."
+    echo "   Or use 'git commit --no-verify' to skip this check (not recommended)."
+    exit 1
+fi
+echo "✓ Formatting check passed"
+
+# Run clippy
+echo "→ Running clippy..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo ""
+    echo "❌ Clippy found issues!"
+    echo "   Fix the issues above before committing."
+    echo "   Or use 'git commit --no-verify' to skip this check (not recommended)."
+    exit 1
+fi
+echo "✓ Clippy check passed"
+
+echo ""
+echo "✅ All pre-commit checks passed!"
+exit 0
+

@@ -4,8 +4,14 @@
 *.pdb
 Cargo.lock
 
-# IDE
-.vscode/
+# IDE (but keep .vscode settings for workspace config)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.cursor/*
+!.cursor/rules/
 .idea/
 *.swp
 *.swo
@@ -23,4 +29,3 @@ Cargo.lock
 # Test files
 /test_output/
 /temp/
-

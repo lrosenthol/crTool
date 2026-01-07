@@ -1,0 +1,9 @@
+{
+  // Recommended extensions for this workspace
+  "recommendations": [
+    "rust-lang.rust-analyzer",      // Rust language support
+    "vadimcn.vscode-lldb",          // Debugger for Rust
+    "serayuzgur.crates",            // Manage Cargo.toml dependencies
+    "tamasfe.even-better-toml"      // Better TOML support
+  ]
+}

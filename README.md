@@ -28,6 +28,11 @@ git clone https://github.com/contentauth/c2pa-rs.git
 
 # Build the project
 cd c2pa-testfile-maker
+
+# Install git hooks (recommended for contributors)
+./scripts/install-hooks.sh
+
+# Build
 cargo build --release
 ```
 
@@ -41,6 +46,15 @@ parent-directory/
 ```
 
 **Note for CI/CD**: The GitHub Actions CI workflow automatically checks out the c2pa-rs repository as a sibling directory, so the path dependency will work correctly in CI environments.
+
+### For Contributors
+
+The project uses automated code formatting and linting:
+- **Pre-commit hooks** check formatting (`cargo fmt`) and linting (`cargo clippy`)
+- Run `./scripts/install-hooks.sh` to install the hooks
+- Run `./scripts/format.sh` to format all code
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow information.
 
 ## Usage
 
@@ -212,6 +226,14 @@ Key dependencies:
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+**Before contributing:**
+1. Install git hooks: `./scripts/install-hooks.sh`
+2. Ensure code is formatted: `cargo fmt`
+3. Ensure clippy passes: `cargo clippy -- -D warnings`
+4. Run tests: `cargo test`
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow and best practices.
 
 ## Resources
 

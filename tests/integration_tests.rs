@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod common;
 
@@ -8,7 +8,7 @@ use common::{
 };
 
 /// Generate output filename from input filename and manifest type
-fn generate_output_name(input: &PathBuf, manifest_type: &str) -> PathBuf {
+fn generate_output_name(input: &Path, manifest_type: &str) -> PathBuf {
     let stem = input.file_stem().unwrap().to_str().unwrap();
     let ext = input.extension().unwrap().to_str().unwrap();
     output_dir().join(format!("{}_{}.{}", stem, manifest_type, ext))

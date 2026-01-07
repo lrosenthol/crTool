@@ -1,45 +1,115 @@
-# Contributing to C2PA Testfile Maker
+# Contributing to c2pa-testfile-maker
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to c2pa-testfile-maker! This document provides guidelines and instructions for contributing.
 
-## Development Setup
+## Getting Started
 
-### Prerequisites
+### 1. Fork and Clone
 
-- Rust 1.70 or later
-- C/C++ compiler (required for some dependencies)
-- Git
-
-### Getting Started
-
-1. Clone the repository:
 ```bash
-git clone https://github.com/lrosenthol/c2pa-testfile-maker.git
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/YOUR_USERNAME/c2pa-testfile-maker.git
 cd c2pa-testfile-maker
+
+# Add the upstream repository
+git remote add upstream https://github.com/lrosenthol/c2pa-testfile-maker.git
 ```
 
-2. **Important**: This project depends on a local copy of the c2pa-rs library. You'll need to clone it:
+### 2. Set Up Dependencies
+
 ```bash
+# Clone the required c2pa-rs dependency as a sibling directory
 cd ..
 git clone https://github.com/contentauth/c2pa-rs.git
 cd c2pa-testfile-maker
 ```
 
-The `Cargo.toml` references the c2pa-rs SDK via a relative path: `{ path = "../c2pa-rs/sdk" }`
+### 3. Install Development Tools
 
-3. Build the project:
 ```bash
+# Install git hooks for automatic formatting and linting checks
+./scripts/install-hooks.sh
+
+# Verify everything works
 cargo build
-```
-
-4. Run tests:
-```bash
 cargo test
 ```
 
-## Running Tests
+## Development Workflow
 
-The integration tests require test certificates. They are automatically included in the repository at `tests/fixtures/certs/`.
+### Creating a Branch
+
+```bash
+# Update your local main branch
+git checkout main
+git pull upstream main
+
+# Create a feature branch
+git checkout -b feature/your-feature-name
+```
+
+### Making Changes
+
+1. **Write your code** following Rust best practices
+2. **Format your code** (automatic via pre-commit hook, or run `cargo fmt`)
+3. **Run clippy** to catch common issues: `cargo clippy -- -D warnings`
+4. **Add/update tests** for your changes
+5. **Run all tests**: `cargo test`
+6. **Update documentation** if needed
+
+### Code Quality Standards
+
+All contributions must meet these requirements:
+
+#### ✅ Formatting
+```bash
+cargo fmt --all
+```
+- Code must be formatted with `rustfmt`
+- Configuration is in `rustfmt.toml`
+- Pre-commit hooks will check this automatically
+
+#### ✅ Linting
+```bash
+cargo clippy --all-targets --all-features -- -D warnings
+```
+- No clippy warnings allowed
+- Fix all clippy suggestions or add `#[allow]` attributes with justification
+
+#### ✅ Tests
+```bash
+cargo test
+```
+- All tests must pass
+- New features should include tests
+- Bug fixes should include regression tests
+
+#### ✅ Documentation
+- Public APIs must be documented with `///` doc comments
+- Complex logic should have inline comments
+- Update README.md if adding user-facing features
+
+### Commit Messages
+
+Write clear, descriptive commit messages:
+
+```
+Add support for PNG thumbnail extraction
+
+- Implement PNG-specific thumbnail handling
+- Add tests for PNG thumbnail cases
+- Update documentation with PNG examples
+
+Fixes #123
+```
+
+**Guidelines:**
+- Use present tense ("Add feature" not "Added feature")
+- First line should be concise (50-72 chars)
+- Provide details in the body if needed
+- Reference issues/PRs with `Fixes #123` or `Relates to #456`
+
+### Testing
 
 ```bash
 # Run all tests
@@ -49,116 +119,180 @@ cargo test
 cargo test -- --nocapture
 
 # Run specific test
-cargo test test_dog_jpg_simple_manifest
+cargo test test_name
+
+# Run tests in release mode (faster)
+cargo test --release
 ```
 
-See [TESTING.md](TESTING.md) for more details on the test infrastructure.
+### Submitting a Pull Request
 
-## Code Style
+1. **Push your changes** to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-This project follows standard Rust conventions:
+2. **Create a Pull Request** on GitHub from your fork to `lrosenthol/c2pa-testfile-maker:main`
 
-- Run `cargo fmt` before committing
-- Run `cargo clippy` and fix any warnings
-- Write tests for new functionality
-- Update documentation as needed
+3. **Fill out the PR template** (if available) with:
+   - Description of changes
+   - Related issues
+   - Testing performed
+   - Screenshots (if UI changes)
 
-```bash
-# Format code
-cargo fmt
+4. **Wait for review**:
+   - CI checks must pass
+   - At least one maintainer approval required
+   - Address any review comments
 
-# Check for common mistakes
-cargo clippy
+5. **Merge**: Once approved, a maintainer will merge your PR
 
-# Check formatting without changing files
-cargo fmt -- --check
+## Code Style Guidelines
+
+### Rust Style
+
+- Follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
+- Use idiomatic Rust patterns
+- Prefer explicit types over `var` when it aids clarity
+- Use meaningful variable and function names
+
+### Error Handling
+
+```rust
+// ✅ Good - uses Result and context
+fn process_file(path: &Path) -> Result<Data> {
+    let content = fs::read_to_string(path)
+        .context("Failed to read file")?;
+    Ok(Data::parse(&content)?)
+}
+
+// ❌ Bad - uses unwrap
+fn process_file(path: &Path) -> Data {
+    let content = fs::read_to_string(path).unwrap();
+    Data::parse(&content).unwrap()
+}
 ```
 
-## Making Changes
+### Documentation
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for your changes
-5. Ensure all tests pass (`cargo test`)
-6. Run `cargo fmt` and `cargo clippy`
-7. Commit your changes (`git commit -m 'Add amazing feature'`)
-8. Push to your branch (`git push origin feature/amazing-feature`)
-9. Open a Pull Request
-
-## Pull Request Guidelines
-
-- Provide a clear description of the changes
-- Reference any related issues
-- Ensure CI checks pass
-- Update documentation if needed
-- Add tests for new functionality
+```rust
+/// Processes a C2PA manifest and embeds it into an asset.
+///
+/// # Arguments
+///
+/// * `manifest` - The JSON manifest configuration
+/// * `input` - Path to the input asset file
+/// * `output` - Path where the signed asset will be written
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The manifest JSON is invalid
+/// - The input file cannot be read
+/// - The signing process fails
+///
+/// # Example
+///
+/// ```no_run
+/// # use c2pa_testfile_maker::*;
+/// process_manifest(manifest, input, output)?;
+/// ```
+pub fn process_manifest(manifest: &str, input: &Path, output: &Path) -> Result<()> {
+    // Implementation
+}
+```
 
 ## Project Structure
 
 ```
 c2pa-testfile-maker/
-├── src/
-│   └── main.rs           # Main CLI application
-├── tests/
-│   ├── common/
-│   │   └── mod.rs        # Test helper functions
-│   ├── fixtures/
-│   │   └── certs/        # Test certificates
-│   └── integration_tests.rs  # Integration tests
-├── examples/             # Example manifest files and certificates
-├── testfiles/            # Test images
-└── Cargo.toml
+├── .git-hooks/          # Git hooks (run via scripts/install-hooks.sh)
+├── .github/             # GitHub Actions workflows
+├── examples/            # Example manifests and test certificates
+├── scripts/             # Helper scripts
+├── src/                 # Source code
+│   └── main.rs         # Main application logic
+├── testfiles/          # Test input files
+├── tests/              # Integration tests
+│   ├── common/         # Test utilities
+│   ├── fixtures/       # Test data
+│   └── *.rs            # Test files
+├── Cargo.toml          # Project dependencies
+├── rustfmt.toml        # Formatting configuration
+└── README.md           # User documentation
 ```
 
-## Adding New Features
+## Common Tasks
 
-When adding new features:
+### Updating Dependencies
 
-1. Update the CLI arguments in `src/main.rs` if needed
-2. Add example manifest files to `examples/` if relevant
-3. Add integration tests in `tests/integration_tests.rs`
-4. Update the README.md with usage examples
-5. Update TESTING.md if test setup changes
+```bash
+# Update all dependencies to latest compatible versions
+cargo update
 
-## Testing with Different Formats
+# Update a specific dependency
+cargo update -p dependency-name
 
-To add support for a new media format:
+# Check for outdated dependencies
+cargo outdated  # requires: cargo install cargo-outdated
+```
 
-1. Add test images to `testfiles/`
-2. Add test cases in `tests/integration_tests.rs`
-3. Update `get_test_images()` in `tests/common/mod.rs`
-4. Ensure the c2pa library supports the format
+### Debugging
 
-## Reporting Issues
+```bash
+# Run with debug output
+RUST_BACKTRACE=1 cargo run -- [args]
 
-When reporting issues, please include:
+# Run with full backtrace
+RUST_BACKTRACE=full cargo run -- [args]
 
-- Rust version (`rustc --version`)
-- Operating system
-- Steps to reproduce
-- Expected vs actual behavior
-- Error messages or logs
+# Use a debugger (requires rust-lldb or rust-gdb)
+rust-lldb target/debug/c2pa-testfile-maker
+```
+
+### Performance Profiling
+
+```bash
+# Build with release optimizations
+cargo build --release
+
+# Profile with perf (Linux)
+perf record ./target/release/c2pa-testfile-maker [args]
+perf report
+
+# Profile with Instruments (macOS)
+instruments -t "Time Profiler" ./target/release/c2pa-testfile-maker [args]
+```
+
+## Getting Help
+
+- **Questions?** Open a GitHub Discussion
+- **Bug report?** Open a GitHub Issue with:
+  - Description of the problem
+  - Steps to reproduce
+  - Expected vs actual behavior
+  - System info (OS, Rust version)
+- **Feature request?** Open a GitHub Issue describing:
+  - The use case
+  - Proposed solution
+  - Alternative approaches considered
 
 ## Code of Conduct
 
 - Be respectful and inclusive
-- Welcome newcomers
-- Focus on constructive feedback
-- Help others learn and grow
+- Provide constructive feedback
+- Focus on what is best for the community
+- Show empathy towards other contributors
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the same license as the project (MIT).
 
-## Questions?
+## Recognition
 
-Feel free to open an issue for questions or discussion!
+Contributors will be recognized in:
+- GitHub contributors list
+- Release notes for significant contributions
+- README.md (for major features)
 
-## Resources
-
-- [C2PA Specification](https://c2pa.org/specifications/specifications/1.0/index.html)
-- [c2pa-rs Documentation](https://docs.rs/c2pa/)
-- [Rust Book](https://doc.rust-lang.org/book/)
-- [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
-
+Thank you for contributing to c2pa-testfile-maker! 🎉
