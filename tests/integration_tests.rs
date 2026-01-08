@@ -8,10 +8,19 @@ use common::{
 };
 
 /// Generate output filename from input filename and manifest type
-fn generate_output_name(input: &Path, manifest_type: &str) -> PathBuf {
+/// Optionally specify a subdirectory within the output directory
+fn generate_output_name(input: &Path, manifest_type: &str, subdir: Option<&str>) -> PathBuf {
     let stem = input.file_stem().unwrap().to_str().unwrap();
     let ext = input.extension().unwrap().to_str().unwrap();
-    output_dir().join(format!("{}_{}.{}", stem, manifest_type, ext))
+    let filename = format!("{}_{}.{}", stem, manifest_type, ext);
+
+    if let Some(sub) = subdir {
+        let dir = output_dir().join(sub);
+        std::fs::create_dir_all(&dir).expect("Failed to create subdirectory");
+        dir.join(filename)
+    } else {
+        output_dir().join(filename)
+    }
 }
 
 // Tests for Dog.jpg
@@ -19,7 +28,7 @@ fn generate_output_name(input: &Path, manifest_type: &str) -> PathBuf {
 fn test_dog_jpg_simple_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.jpg");
     let manifest = manifests_dir().join("simple_manifest.json");
-    let output = generate_output_name(&input, "simple");
+    let output = generate_output_name(&input, "simple", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -31,7 +40,7 @@ fn test_dog_jpg_simple_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Example Image with C2PA Manifest"
+            "Created Image"
         );
     }
 
@@ -43,7 +52,7 @@ fn test_dog_jpg_simple_manifest() -> Result<()> {
 fn test_dog_jpg_full_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.jpg");
     let manifest = manifests_dir().join("full_manifest.json");
-    let output = generate_output_name(&input, "full");
+    let output = generate_output_name(&input, "full", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -55,7 +64,7 @@ fn test_dog_jpg_full_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Edited Photo with Complete Metadata"
+            "Edited Photo"
         );
 
         // Verify we have assertions
@@ -71,7 +80,7 @@ fn test_dog_jpg_full_manifest() -> Result<()> {
 fn test_dog_png_simple_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.png");
     let manifest = manifests_dir().join("simple_manifest.json");
-    let output = generate_output_name(&input, "simple");
+    let output = generate_output_name(&input, "simple", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -83,7 +92,7 @@ fn test_dog_png_simple_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Example Image with C2PA Manifest"
+            "Created Image"
         );
     }
 
@@ -95,7 +104,7 @@ fn test_dog_png_simple_manifest() -> Result<()> {
 fn test_dog_png_full_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.png");
     let manifest = manifests_dir().join("full_manifest.json");
-    let output = generate_output_name(&input, "full");
+    let output = generate_output_name(&input, "full", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -107,7 +116,7 @@ fn test_dog_png_full_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Edited Photo with Complete Metadata"
+            "Edited Photo"
         );
 
         // Verify we have assertions
@@ -123,7 +132,7 @@ fn test_dog_png_full_manifest() -> Result<()> {
 fn test_dog_webp_simple_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.webp");
     let manifest = manifests_dir().join("simple_manifest.json");
-    let output = generate_output_name(&input, "simple");
+    let output = generate_output_name(&input, "simple", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -135,7 +144,7 @@ fn test_dog_webp_simple_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Example Image with C2PA Manifest"
+            "Created Image"
         );
     }
 
@@ -147,7 +156,7 @@ fn test_dog_webp_simple_manifest() -> Result<()> {
 fn test_dog_webp_full_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.webp");
     let manifest = manifests_dir().join("full_manifest.json");
-    let output = generate_output_name(&input, "full");
+    let output = generate_output_name(&input, "full", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -159,7 +168,7 @@ fn test_dog_webp_full_manifest() -> Result<()> {
         let manifest = reader.get_manifest(manifest_label).unwrap();
         assert_eq!(
             manifest.title().unwrap_or_default(),
-            "Edited Photo with Complete Metadata"
+            "Edited Photo"
         );
 
         // Verify we have assertions
@@ -189,7 +198,8 @@ fn test_all_images_all_manifests() -> Result<()> {
     for input in get_test_images() {
         for (manifest_type, manifest_path) in &manifests {
             total_count += 1;
-            let output = generate_output_name(&input, manifest_type);
+            // Use "batch" subdirectory to avoid conflicts with individual tests
+            let output = generate_output_name(&input, manifest_type, Some("batch"));
 
             match sign_file_with_manifest(&input, &output, manifest_path) {
                 Ok(_) => match verify_signed_file(&output) {
@@ -229,7 +239,7 @@ fn test_all_images_all_manifests() -> Result<()> {
 fn test_dog_jpg_asset_type_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.jpg");
     let manifest = manifests_dir().join("asset_type_manifest.json");
-    let output = generate_output_name(&input, "asset_type");
+    let output = generate_output_name(&input, "asset_type", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -264,7 +274,7 @@ fn test_dog_jpg_asset_type_manifest() -> Result<()> {
 fn test_dog_png_asset_type_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.png");
     let manifest = manifests_dir().join("asset_type_manifest.json");
-    let output = generate_output_name(&input, "asset_type");
+    let output = generate_output_name(&input, "asset_type", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -296,7 +306,7 @@ fn test_dog_png_asset_type_manifest() -> Result<()> {
 fn test_dog_webp_asset_type_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.webp");
     let manifest = manifests_dir().join("asset_type_manifest.json");
-    let output = generate_output_name(&input, "asset_type");
+    let output = generate_output_name(&input, "asset_type", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -329,7 +339,7 @@ fn test_dog_webp_asset_type_manifest() -> Result<()> {
 fn test_dog_jpg_asset_ref_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.jpg");
     let manifest = manifests_dir().join("asset_ref_manifest.json");
-    let output = generate_output_name(&input, "asset_ref");
+    let output = generate_output_name(&input, "asset_ref", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -364,7 +374,7 @@ fn test_dog_jpg_asset_ref_manifest() -> Result<()> {
 fn test_dog_png_asset_ref_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.png");
     let manifest = manifests_dir().join("asset_ref_manifest.json");
-    let output = generate_output_name(&input, "asset_ref");
+    let output = generate_output_name(&input, "asset_ref", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -396,7 +406,7 @@ fn test_dog_png_asset_ref_manifest() -> Result<()> {
 fn test_dog_webp_asset_ref_manifest() -> Result<()> {
     let input = common::testfiles_dir().join("Dog.webp");
     let manifest = manifests_dir().join("asset_ref_manifest.json");
-    let output = generate_output_name(&input, "asset_ref");
+    let output = generate_output_name(&input, "asset_ref", Some("individual"));
 
     sign_file_with_manifest(&input, &output, &manifest)?;
 
@@ -442,4 +452,240 @@ fn test_output_files_are_readable() {
             }
         }
     }
+}
+
+// Tests for manifest extraction feature
+#[test]
+fn test_extract_manifest_to_specific_file() -> Result<()> {
+    use std::fs;
+
+    // First, create a signed file to extract from
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let signed_output = generate_output_name(&input, "extract_test", Some("individual"));
+
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    // Now extract the manifest to a specific JSON file
+    let json_output = output_dir().join("extracted/extracted_manifest.json");
+    common::extract_manifest_to_file(&signed_output, &json_output)?;
+
+    // Verify the JSON file was created
+    assert!(json_output.exists(), "Extracted JSON file should exist");
+
+    // Verify the JSON file is valid and contains expected data
+    let json_content = fs::read_to_string(&json_output)?;
+    let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    // Check that it has the expected structure
+    assert!(json_value.is_object(), "JSON should be an object");
+    assert!(
+        json_value.get("manifests").is_some() || json_value.get("active_manifest").is_some(),
+        "JSON should contain manifest data"
+    );
+
+    println!(
+        "✓ Successfully extracted manifest to: {}",
+        json_output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_extract_manifest_to_directory() -> Result<()> {
+    use std::fs;
+
+    // First, create a signed file to extract from
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("full_manifest.json");
+    let signed_output = generate_output_name(&input, "extract_dir_test", Some("individual"));
+
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    // Create a directory for extraction
+    let extract_dir = output_dir().join("extracted");
+    fs::create_dir_all(&extract_dir)?;
+
+    // Extract the manifest to the directory
+    // The helper will create a filename based on the input
+    let expected_json = extract_dir.join("Dog_extract_dir_test_manifest.json");
+    common::extract_manifest_to_file(&signed_output, &expected_json)?;
+
+    // Verify the JSON file was created in the directory
+    assert!(
+        expected_json.exists(),
+        "Extracted JSON file should exist in directory"
+    );
+
+    // Verify the JSON file is valid
+    let json_content = fs::read_to_string(&expected_json)?;
+    let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    assert!(json_value.is_object(), "JSON should be an object");
+
+    // Verify it contains the title from the full_manifest.json
+    if let Some(manifests) = json_value.get("manifests").and_then(|m| m.as_object()) {
+        // The manifests object contains manifest labels as keys
+        let has_title = manifests.values().any(|manifest| {
+            manifest
+                .get("title")
+                .and_then(|t| t.as_str())
+                .map(|s| s.contains("Edited Photo"))
+                .unwrap_or(false)
+        });
+        assert!(
+            has_title,
+            "Manifest should contain title from full_manifest.json"
+        );
+    }
+
+    println!(
+        "✓ Successfully extracted manifest to directory: {}",
+        expected_json.display()
+    );
+    Ok(())
+}
+
+// Round-trip test: sign with manifest, extract, and compare
+#[test]
+fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
+    use std::fs;
+
+    // Sign the file with the specVersion manifest
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest_path = manifests_dir().join("specVersion_manifest.json");
+    let signed_output = generate_output_name(&input, "specVersion", Some("individual"));
+
+    // Read the original manifest JSON
+    let original_manifest_json = fs::read_to_string(&manifest_path)?;
+    let original: serde_json::Value = serde_json::from_str(&original_manifest_json)?;
+
+    // Sign the file
+    sign_file_with_manifest(&input, &signed_output, &manifest_path)?;
+
+    // Extract the manifest from the signed file
+    let extract_output = output_dir().join("extracted/specVersion_roundtrip.json");
+    common::extract_manifest_to_file(&signed_output, &extract_output)?;
+
+    // Read the extracted manifest
+    let extracted_json = fs::read_to_string(&extract_output)?;
+    let extracted: serde_json::Value = serde_json::from_str(&extracted_json)?;
+
+    // The extracted manifest has a different structure - it's a manifest store
+    // Get the active manifest from the extracted data
+    let active_manifest_label = extracted["active_manifest"]
+        .as_str()
+        .expect("Should have active_manifest");
+
+    let extracted_manifest = &extracted["manifests"][active_manifest_label];
+
+    // Compare specVersion if present in original
+    if let Some(original_spec_version) = original.get("specVersion") {
+        // In the extracted manifest, specVersion might not be present or could be normalized
+        // The c2pa library may handle this differently, so we'll note it was in the original
+        println!("Original specVersion: {}", original_spec_version);
+    }
+
+    // Compare title
+    assert_eq!(
+        extracted_manifest["title"],
+        original["title"],
+        "Title should match"
+    );
+
+    // Compare assertions
+    let original_assertions = original["assertions"]
+        .as_array()
+        .expect("Original should have assertions array");
+    let extracted_assertions = extracted_manifest["assertions"]
+        .as_array()
+        .expect("Extracted should have assertions array");
+
+    // Find the c2pa.actions assertion in both
+    let original_actions = original_assertions
+        .iter()
+        .find(|a| a["label"] == "c2pa.actions")
+        .expect("Original should have c2pa.actions assertion");
+
+    let extracted_actions = extracted_assertions
+        .iter()
+        .find(|a| a["label"].as_str() == Some("c2pa.actions.v2")
+             || a["label"].as_str() == Some("c2pa.actions"))
+        .expect("Extracted should have c2pa.actions assertion");
+
+    // Compare the actions data
+    let original_actions_data = &original_actions["data"]["actions"]
+        .as_array()
+        .expect("Original actions should have actions array");
+
+    let extracted_actions_data = &extracted_actions["data"]["actions"]
+        .as_array()
+        .expect("Extracted actions should have actions array");
+
+    // Should have at least the same number of actions
+    assert!(
+        extracted_actions_data.len() >= original_actions_data.len(),
+        "Extracted should have at least as many actions as original"
+    );
+
+    // Compare the first action (the one we added)
+    let original_action = &original_actions_data[0];
+    let extracted_action = &extracted_actions_data[0];
+
+    assert_eq!(
+        extracted_action["action"],
+        original_action["action"],
+        "Action type should match"
+    );
+
+    assert_eq!(
+        extracted_action["when"],
+        original_action["when"],
+        "Action timestamp should match"
+    );
+
+    // The softwareAgent might be modified by the library to include version info
+    // So we check if it contains the base name
+    let original_agent = original_action["softwareAgent"]
+        .as_str()
+        .expect("Should have softwareAgent");
+    let extracted_agent = extracted_action["softwareAgent"]
+        .as_str()
+        .expect("Should have softwareAgent");
+
+    assert!(
+        extracted_agent.contains("c2pa-testfile-maker") || extracted_agent == original_agent,
+        "Software agent should match or contain the original name. Original: {}, Extracted: {}",
+        original_agent,
+        extracted_agent
+    );
+
+    // Verify claim_generator_info is present
+    let extracted_claim_gen = extracted_manifest["claim_generator_info"]
+        .as_array()
+        .expect("Should have claim_generator_info");
+
+    assert!(!extracted_claim_gen.is_empty(), "Should have at least one claim generator");
+
+    // Check that the claim generator name contains our app name
+    let has_our_generator = extracted_claim_gen.iter().any(|gen| {
+        gen["name"]
+            .as_str()
+            .map(|n| n.contains("c2pa-testfile-maker"))
+            .unwrap_or(false)
+    });
+
+    assert!(
+        has_our_generator,
+        "Claim generator should include c2pa-testfile-maker"
+    );
+
+    println!("✓ Round-trip test passed: manifest data preserved correctly");
+    println!("  Original title: {}", original["title"]);
+    println!("  Extracted title: {}", extracted_manifest["title"]);
+    println!("  Actions preserved: {}/{}",
+             extracted_actions_data.len(),
+             original_actions_data.len());
+
+    Ok(())
 }

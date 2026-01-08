@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use c2pa::{create_signer, Builder, CallbackSigner, SigningAlg};
+use c2pa::{create_signer, Builder, CallbackSigner, Reader, SigningAlg};
 use clap::Parser;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Path to the JSON manifest configuration file
+    /// Path to the JSON manifest configuration file (not required in extract mode)
     #[arg(short, long, value_name = "FILE")]
-    manifest: PathBuf,
+    manifest: Option<PathBuf>,
 
     /// Path to the input media asset (JPEG, PNG, etc.)
     #[arg(short, long, value_name = "FILE")]
@@ -20,13 +20,13 @@ struct Cli {
     #[arg(short, long, value_name = "PATH")]
     output: PathBuf,
 
-    /// Path to the certificate file (PEM format)
+    /// Path to the certificate file (PEM format, not required in extract mode)
     #[arg(short, long, value_name = "FILE")]
-    cert: PathBuf,
+    cert: Option<PathBuf>,
 
-    /// Path to the private key file (PEM format)
+    /// Path to the private key file (PEM format, not required in extract mode)
     #[arg(short, long, value_name = "FILE")]
-    key: PathBuf,
+    key: Option<PathBuf>,
 
     /// Signing algorithm (es256, es384, es512, ps256, ps384, ps512, ed25519)
     /// If not specified, will be auto-detected from the certificate
@@ -36,6 +36,10 @@ struct Cli {
     /// Allow self-signed certificates (for testing/development only)
     #[arg(long, default_value = "false")]
     allow_self_signed: bool,
+
+    /// Extract manifest from input file to JSON (read-only mode)
+    #[arg(short, long, default_value = "false")]
+    extract: bool,
 }
 
 fn determine_output_path(input: &Path, output: &Path) -> Result<PathBuf> {
@@ -198,17 +202,90 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     Ok(signature.to_vec())
 }
 
+/// Extract C2PA manifest from a file and save it as JSON
+fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
+    // Validate input file exists
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    println!("Extracting C2PA manifest...");
+    println!("  Input: {:?}", input_path);
+
+    // Create a Reader from the input file
+    let reader = Reader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    // Get the active manifest
+    let active_label = reader
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?;
+
+    println!("  Active manifest label: {}", active_label);
+
+    // Get the manifest JSON string
+    let manifest_json = reader.json();
+
+    // Determine the final output path
+    let final_output_path = if output_path.is_dir() {
+        // If output is a directory, create a filename based on the input
+        let input_stem = input_path
+            .file_stem()
+            .context("Input file has no filename")?
+            .to_str()
+            .context("Invalid UTF-8 in filename")?;
+        output_path.join(format!("{}_manifest.json", input_stem))
+    } else {
+        output_path.to_path_buf()
+    };
+
+    // Create output directory if it doesn't exist
+    if let Some(parent) = final_output_path.parent() {
+        fs::create_dir_all(parent).context("Failed to create output directory")?;
+    }
+
+    // Parse and re-serialize the JSON for pretty formatting
+    let json_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse manifest JSON")?;
+    let pretty_json = serde_json::to_string_pretty(&json_value).context("Failed to format JSON")?;
+
+    fs::write(&final_output_path, pretty_json)
+        .context("Failed to write manifest JSON to output file")?;
+
+    println!("✓ Successfully extracted C2PA manifest");
+    println!("  Output file: {:?}", final_output_path);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
-
-    // Read and parse the JSON manifest configuration
-    let manifest_json =
-        fs::read_to_string(&cli.manifest).context("Failed to read manifest JSON file")?;
 
     // Validate input file exists
     if !cli.input.exists() {
         anyhow::bail!("Input file does not exist: {:?}", cli.input);
     }
+
+    // Handle extract mode
+    if cli.extract {
+        return extract_manifest(&cli.input, &cli.output);
+    }
+
+    // Normal signing mode - validate required arguments
+    let manifest = cli
+        .manifest
+        .context("--manifest is required when not in extract mode")?;
+    let cert = cli
+        .cert
+        .context("--cert is required when not in extract mode")?;
+    let key = cli
+        .key
+        .context("--key is required when not in extract mode")?;
+
+    // Read and parse the JSON manifest configuration
+    let manifest_json =
+        fs::read_to_string(&manifest).context("Failed to read manifest JSON file")?;
 
     // Determine the output path
     let output_path = determine_output_path(&cli.input, &cli.output)?;
@@ -229,7 +306,7 @@ fn main() -> Result<()> {
         parse_signing_algorithm(alg_str)?
     } else {
         println!("Auto-detecting signing algorithm from certificate...");
-        let detected = detect_signing_algorithm(&cli.cert)?;
+        let detected = detect_signing_algorithm(&cert)?;
         println!("  Detected: {:?}", detected);
         detected
     };
@@ -249,7 +326,7 @@ fn main() -> Result<()> {
     // Sign and embed the manifest into the asset
     if cli.allow_self_signed {
         // Use callback signer that bypasses certificate validation
-        let signer = create_callback_signer(&cli.cert, &cli.key, signing_alg)
+        let signer = create_callback_signer(&cert, &key, signing_alg)
             .context("Failed to create callback signer")?;
         builder
             .sign_file(&signer, &cli.input, &output_path)
@@ -257,8 +334,8 @@ fn main() -> Result<()> {
     } else {
         // Use standard signer with full certificate validation
         let signer = create_signer::from_files(
-            cli.cert.to_str().context("Invalid cert path")?,
-            cli.key.to_str().context("Invalid key path")?,
+            cert.to_str().context("Invalid cert path")?,
+            key.to_str().context("Invalid key path")?,
             signing_alg,
             None,
         )

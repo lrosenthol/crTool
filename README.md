@@ -72,14 +72,15 @@ c2pa-testfile-maker \
 
 ### Options
 
-- `-m, --manifest <FILE>`: Path to the JSON manifest configuration file (required)
+- `-m, --manifest <FILE>`: Path to the JSON manifest configuration file (required for signing, not needed for extract mode)
 - `-i, --input <FILE>`: Path to the input media asset (JPEG, PNG, etc.) (required)
 - `-o, --output <PATH>`: Path to the output file or directory (required)
-- `-c, --cert <FILE>`: Path to the certificate file in PEM format (required)
-- `-k, --key <FILE>`: Path to the private key file in PEM format (required)
+- `-c, --cert <FILE>`: Path to the certificate file in PEM format (required for signing, not needed for extract mode)
+- `-k, --key <FILE>`: Path to the private key file in PEM format (required for signing, not needed for extract mode)
 - `-a, --algorithm <ALGORITHM>`: Signing algorithm (optional, auto-detected from certificate if not specified)
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
   - Auto-detection examines the certificate to determine the appropriate algorithm
+- `-e, --extract`: Extract manifest from input file to JSON (read-only mode, no signing)
 - `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
   - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
   - Bypasses certificate chain validation during signer creation
@@ -128,6 +129,33 @@ If the output path is a directory, the tool will create a file with the same nam
   --key certs/private_key.pem
 # Creates: output/sample.jpg
 ```
+
+### Extracting Manifests
+
+You can extract existing C2PA manifests from signed files using the `-e/--extract` option. This is useful for inspecting, analyzing, or archiving manifest data:
+
+```bash
+# Extract to a specific file
+./target/release/c2pa-testfile-maker \
+  --extract \
+  --input signed_image.jpg \
+  --output manifest.json
+
+# Extract to a directory (auto-generates filename based on input)
+./target/release/c2pa-testfile-maker \
+  --extract \
+  --input signed_image.jpg \
+  --output output_directory/
+# Creates: output_directory/signed_image_manifest.json
+```
+
+In extract mode:
+- No certificate, key, or manifest file is required
+- The tool reads the C2PA manifest from the input file using the c2pa-rs Reader
+- The manifest is exported as formatted JSON
+- If the output is a directory, the filename is auto-generated as `{input_stem}_manifest.json`
+- The extracted JSON contains the complete manifest store including all assertions, signatures, and metadata
+
 
 ### Algorithm Auto-Detection
 

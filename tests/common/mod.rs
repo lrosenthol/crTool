@@ -108,6 +108,38 @@ pub fn get_test_images() -> Vec<PathBuf> {
     ]
 }
 
+/// Helper function to extract manifest from a signed file
+pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result<()> {
+    // Remove output file if it already exists
+    if output_path.exists() {
+        fs::remove_file(output_path)?;
+    }
+
+    // Create a Reader from the input file
+    let reader = Reader::from_file(input_path)?;
+
+    // Ensure there's an active manifest
+    let _active_label = reader
+        .active_label()
+        .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+
+    // Get the manifest JSON
+    let manifest_json = reader.json();
+
+    // Create output directory if needed
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Parse and re-serialize the JSON for pretty formatting
+    let json_value: serde_json::Value = serde_json::from_str(&manifest_json)?;
+    let pretty_json = serde_json::to_string_pretty(&json_value)?;
+
+    fs::write(output_path, pretty_json)?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
