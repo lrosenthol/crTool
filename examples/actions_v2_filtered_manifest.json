@@ -1,0 +1,67 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Action V2 - Filtered with Multiple Actions",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T09:00:00Z",
+                        "softwareAgentIndex": 0,
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
+                    },
+                    {
+                        "action": "c2pa.filtered",
+                        "when": "2024-01-07T09:30:00Z",
+                        "softwareAgentIndex": 1,
+                        "description": "Applied vintage film filter",
+                        "parameters": {
+                            "filterName": "Vintage Film 1970s",
+                            "intensity": 0.75,
+                            "vignette": true,
+                            "grainAmount": 0.3,
+                            "multipleInstances": false
+                        },
+                        "related": [
+                            {
+                                "action": "c2pa.color_adjustments",
+                                "description": "Part of filter: adjusted color temperature",
+                                "parameters": {
+                                    "temperature": -15,
+                                    "tint": 5
+                                }
+                            },
+                            {
+                                "action": "c2pa.adjustedColor",
+                                "description": "Part of filter: added sepia tone",
+                                "parameters": {
+                                    "sepia": 0.4
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "softwareAgents": [
+                    {
+                        "name": "SmartCamera App",
+                        "version": "2.0.3"
+                    },
+                    {
+                        "name": "FilterMaster Pro",
+                        "version": "5.1.0"
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

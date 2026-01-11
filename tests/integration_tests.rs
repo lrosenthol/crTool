@@ -184,6 +184,26 @@ fn test_all_images_all_manifests() -> Result<()> {
             "external_reference",
             manifests_dir().join("external_reference_manifest.json"),
         ),
+        (
+            "actions_v2_edited",
+            manifests_dir().join("actions_v2_edited_manifest.json"),
+        ),
+        (
+            "actions_v2_translated",
+            manifests_dir().join("actions_v2_translated_manifest.json"),
+        ),
+        (
+            "actions_v2_redacted",
+            manifests_dir().join("actions_v2_redacted_manifest.json"),
+        ),
+        (
+            "actions_v2_cropped",
+            manifests_dir().join("actions_v2_cropped_manifest.json"),
+        ),
+        (
+            "actions_v2_filtered",
+            manifests_dir().join("actions_v2_filtered_manifest.json"),
+        ),
     ];
 
     let mut success_count = 0;
@@ -225,6 +245,157 @@ fn test_all_images_all_manifests() -> Result<()> {
         "All image/manifest combinations should succeed"
     );
 
+    Ok(())
+}
+
+// Tests for actions v2 manifests
+#[test]
+fn test_actions_v2_edited_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("actions_v2_edited_manifest.json");
+    let output = generate_output_name(&input, "actions_v2_edited", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Action V2 - Edited with Template"
+        );
+
+        let assertions = manifest.assertions();
+        let has_actions_v2 = assertions.iter().any(|a| a.label() == "c2pa.actions.v2");
+        assert!(has_actions_v2, "Should have c2pa.actions.v2 assertion");
+    }
+
+    println!(
+        "✓ Dog.jpg with actions_v2_edited_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_actions_v2_translated_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("actions_v2_translated_manifest.json");
+    let output = generate_output_name(&input, "actions_v2_translated", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Action V2 - Translated"
+        );
+
+        let assertions = manifest.assertions();
+        let has_actions_v2 = assertions.iter().any(|a| a.label() == "c2pa.actions.v2");
+        assert!(has_actions_v2, "Should have c2pa.actions.v2 assertion");
+    }
+
+    println!(
+        "✓ Dog.png with actions_v2_translated_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_actions_v2_redacted_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("actions_v2_redacted_manifest.json");
+    let output = generate_output_name(&input, "actions_v2_redacted", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Action V2 - Redacted"
+        );
+
+        let assertions = manifest.assertions();
+        let has_actions_v2 = assertions.iter().any(|a| a.label() == "c2pa.actions.v2");
+        assert!(has_actions_v2, "Should have c2pa.actions.v2 assertion");
+    }
+
+    println!(
+        "✓ Dog.webp with actions_v2_redacted_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_actions_v2_cropped_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("actions_v2_cropped_manifest.json");
+    let output = generate_output_name(&input, "actions_v2_cropped", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Action V2 - Cropped"
+        );
+
+        let assertions = manifest.assertions();
+        let has_actions_v2 = assertions.iter().any(|a| a.label() == "c2pa.actions.v2");
+        assert!(has_actions_v2, "Should have c2pa.actions.v2 assertion");
+    }
+
+    println!(
+        "✓ Dog.jpg with actions_v2_cropped_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_actions_v2_filtered_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("actions_v2_filtered_manifest.json");
+    let output = generate_output_name(&input, "actions_v2_filtered", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Action V2 - Filtered with Multiple Actions"
+        );
+
+        let assertions = manifest.assertions();
+        let has_actions_v2 = assertions.iter().any(|a| a.label() == "c2pa.actions.v2");
+        assert!(has_actions_v2, "Should have c2pa.actions.v2 assertion");
+    }
+
+    println!(
+        "✓ Dog.png with actions_v2_filtered_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 

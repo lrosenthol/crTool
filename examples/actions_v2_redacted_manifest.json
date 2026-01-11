@@ -1,0 +1,32 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Action V2 - Redacted",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.redacted",
+                        "when": "2024-01-07T16:45:00Z",
+                        "softwareAgent": {
+                            "name": "PrivacyGuard Pro",
+                            "version": "1.8.0"
+                        },
+                        "reason": "c2pa.PII.present",
+                        "description": "Redacted personally identifiable information from image",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

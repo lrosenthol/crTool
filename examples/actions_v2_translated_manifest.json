@@ -1,0 +1,36 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Action V2 - Translated",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.translated",
+                        "when": "2024-01-07T14:30:00Z",
+                        "softwareAgent": {
+                            "name": "TranslationEngine AI",
+                            "version": "2.1.0"
+                        },
+                        "description": "Translated embedded text from English to Spanish",
+                        "parameters": {
+                            "sourceLanguage": "en-US",
+                            "targetLanguage": "es-ES",
+                            "translationModel": "neural-v3",
+                            "confidence": 0.98
+                        }
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

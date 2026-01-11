@@ -1,0 +1,38 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Action V2 - Cropped",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.cropped",
+                        "when": "2024-01-07T11:20:00Z",
+                        "softwareAgent": {
+                            "name": "ImageTools Studio",
+                            "version": "4.2.1"
+                        },
+                        "description": "Cropped to 16:9 aspect ratio",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+                        "parameters": {
+                            "aspectRatio": "16:9",
+                            "originalWidth": 2560,
+                            "originalHeight": 1440,
+                            "newWidth": 1920,
+                            "newHeight": 1080
+                        }
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

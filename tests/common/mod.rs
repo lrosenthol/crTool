@@ -167,6 +167,11 @@ mod tests {
         let cloud_data = manifests_dir().join("cloud_data_manifest.json");
         let depthmap_gdepth = manifests_dir().join("depthmap_gdepth_manifest.json");
         let external_reference = manifests_dir().join("external_reference_manifest.json");
+        let actions_v2_edited = manifests_dir().join("actions_v2_edited_manifest.json");
+        let actions_v2_translated = manifests_dir().join("actions_v2_translated_manifest.json");
+        let actions_v2_redacted = manifests_dir().join("actions_v2_redacted_manifest.json");
+        let actions_v2_cropped = manifests_dir().join("actions_v2_cropped_manifest.json");
+        let actions_v2_filtered = manifests_dir().join("actions_v2_filtered_manifest.json");
 
         assert!(simple.exists(), "simple_manifest.json should exist");
         assert!(full.exists(), "full_manifest.json should exist");
@@ -180,6 +185,26 @@ mod tests {
         assert!(
             external_reference.exists(),
             "external_reference_manifest.json should exist"
+        );
+        assert!(
+            actions_v2_edited.exists(),
+            "actions_v2_edited_manifest.json should exist"
+        );
+        assert!(
+            actions_v2_translated.exists(),
+            "actions_v2_translated_manifest.json should exist"
+        );
+        assert!(
+            actions_v2_redacted.exists(),
+            "actions_v2_redacted_manifest.json should exist"
+        );
+        assert!(
+            actions_v2_cropped.exists(),
+            "actions_v2_cropped_manifest.json should exist"
+        );
+        assert!(
+            actions_v2_filtered.exists(),
+            "actions_v2_filtered_manifest.json should exist"
         );
     }
 

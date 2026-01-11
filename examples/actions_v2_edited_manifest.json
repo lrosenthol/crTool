@@ -1,0 +1,53 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Action V2 - Edited with Template",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2024-01-07T10:00:00Z",
+                        "softwareAgentIndex": 0
+                    },
+                    {
+                        "action": "c2pa.edited",
+                        "when": "2024-01-07T10:15:00Z",
+                        "softwareAgentIndex": 0,
+                        "description": "Applied color correction and enhanced details",
+                        "parameters": {
+                            "brightness": 15,
+                            "contrast": 10,
+                            "saturation": 5
+                        }
+                    }
+                ],
+                "softwareAgents": [
+                    {
+                        "name": "PhotoEditor Pro",
+                        "version": "3.5.2"
+                    }
+                ],
+                "templates": [
+                    {
+                        "action": "c2pa.edited",
+                        "description": "Standard photo editing template",
+                        "templateParameters": {
+                            "category": "color-correction",
+                            "preset": "portrait-enhancement"
+                        }
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}
