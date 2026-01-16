@@ -1,31 +1,31 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "c2pa-testfile-maker/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Image with Single Ingredient",
-  "format": "image/jpeg",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.edited",
-            "when": "2024-01-07T12:00:00Z",
-            "softwareAgent": "Test Editor"
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients_from_files": [
-    {
-      "title": "Original Image",
-      "relationship": "parentOf",
-      "file_path": "../testfiles/Dog.jpg"
-    }
-  ]
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Single Ingredient",
+    "format": "image/jpeg",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "c2pa-testfile-maker 0.1.0"
+                    }
+                ]
+            }
+        }
+    ],
+    "ingredients_from_files": [
+        {
+            "title": "Original Image",
+            "relationship": "componentOf",
+            "file_path": "../testfiles/Dog.jpg"
+        }
+    ]
 }

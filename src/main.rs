@@ -16,7 +16,7 @@ struct Cli {
     manifest: Option<PathBuf>,
 
     /// Path(s) to input media asset(s) (JPEG, PNG, etc.). Supports glob patterns (e.g., "*.jpg", "images/*.png")
-    #[arg(short, long, value_name = "FILE", num_args = 1..)]
+    #[arg(value_name = "INPUT_FILE", required = true, num_args = 1..)]
     input: Vec<String>,
 
     /// Path to the output file or directory (required when processing single file, must be directory for multiple files)

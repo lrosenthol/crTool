@@ -64,7 +64,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow informati
 ```bash
 c2pa-testfile-maker \
   --manifest <MANIFEST_JSON> \
-  --input <INPUT_FILE(S)> \
+  <INPUT_FILE(S)> \
   --output <OUTPUT_PATH> \
   --cert <CERTIFICATE_FILE> \
   --key <PRIVATE_KEY_FILE> \
@@ -73,8 +73,8 @@ c2pa-testfile-maker \
 
 ### Options
 
+- `<INPUT_FILE>...`: Path(s) to input media asset(s) (JPEG, PNG, etc.) (required). Supports multiple files and glob patterns (e.g., `*.jpg`, `images/*.png`)
 - `-m, --manifest <FILE>`: Path to the JSON manifest configuration file (required for signing, not needed for extract mode)
-- `-i, --input <FILE>...`: Path(s) to input media asset(s) (JPEG, PNG, etc.) (required). Supports multiple files and glob patterns (e.g., `*.jpg`, `images/*.png`)
 - `-o, --output <PATH>`: Path to the output file or directory (required). When processing multiple files, output must be a directory
 - `-c, --cert <FILE>`: Path to the certificate file in PEM format (required for signing, not needed for extract mode)
 - `-k, --key <FILE>`: Path to the private key file in PEM format (required for signing, not needed for extract mode)
@@ -101,7 +101,7 @@ c2pa-testfile-maker \
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input examples/sample.jpg \
+  examples/sample.jpg \
   --output output/signed_sample.jpg \
   --cert certs/certificate.pem \
   --key certs/private_key.pem
@@ -115,7 +115,7 @@ Process multiple files with the same manifest:
 # Using explicit file list
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input testfiles/Dog.jpg testfiles/C.jpg \
+  testfiles/Dog.jpg testfiles/C.jpg \
   --output output/ \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -124,7 +124,7 @@ Process multiple files with the same manifest:
 # Using glob patterns
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input "testfiles/*.jpg" \
+  "testfiles/*.jpg" \
   --output output/ \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -133,7 +133,7 @@ Process multiple files with the same manifest:
 # Multiple glob patterns
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input "testfiles/*.jpg" "images/*.png" \
+  "testfiles/*.jpg" "images/*.png" \
   --output output/ \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -151,7 +151,7 @@ For development and testing, you can use the included test certificates with the
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/simple_manifest.json \
-  --input testfiles/Dog.jpg \
+  testfiles/Dog.jpg \
   --output output/Dog_signed.jpg \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -168,7 +168,7 @@ If the output path is a directory, the tool will create a file with the same nam
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input examples/sample.jpg \
+  examples/sample.jpg \
   --output output/ \
   --cert certs/certificate.pem \
   --key certs/private_key.pem
@@ -180,7 +180,7 @@ When processing multiple files, output **must** be a directory:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input "testfiles/*.jpg" \
+  "testfiles/*.jpg" \
   --output output/ \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -195,21 +195,18 @@ You can extract existing C2PA manifests from signed files using the `-e/--extrac
 ```bash
 # Extract from a single file to a specific file
 ./target/release/c2pa-testfile-maker \
-  --extract \
-  --input signed_image.jpg \
+  -e signed_image.jpg \
   --output manifest.json
 
 # Extract from a single file to a directory (auto-generates filename based on input)
 ./target/release/c2pa-testfile-maker \
-  --extract \
-  --input signed_image.jpg \
+  -e signed_image.jpg \
   --output output_directory/
 # Creates: output_directory/signed_image_manifest.json
 
 # Extract from multiple files (output must be a directory)
 ./target/release/c2pa-testfile-maker \
-  --extract \
-  --input "output/*.jpg" \
+  -e "output/*.jpg" \
   --output manifests/
 # Creates: manifests/image1_manifest.json, manifests/image2_manifest.json, etc.
 ```
@@ -235,7 +232,7 @@ Example with auto-detection:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/manifest.json \
-  --input examples/sample.jpg \
+  examples/sample.jpg \
   --output output/signed_sample.jpg \
   --cert certs/certificate.pem \
   --key certs/private_key.pem
@@ -355,7 +352,7 @@ Example command:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/with_ingredients_from_files.json \
-  --input output/edited_photo.jpg \
+  output/edited_photo.jpg \
   --output output/signed_with_ingredients.jpg \
   --cert certs/certificate.pem \
   --key certs/private_key.pem \
@@ -368,7 +365,7 @@ To specify a custom base directory for ingredient paths:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest manifest.json \
-  --input edited.jpg \
+  edited.jpg \
   --output signed.jpg \
   --cert cert.pem \
   --key key.pem \
@@ -433,7 +430,7 @@ Create a signed image with a simple manifest:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/simple_manifest.json \
-  --input testfiles/Dog.jpg \
+  testfiles/Dog.jpg \
   --output output/Dog_signed.jpg \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -446,7 +443,7 @@ Create a signed image with ingredients and thumbnails:
 ```bash
 ./target/release/c2pa-testfile-maker \
   --manifest examples/with_ingredients_from_files.json \
-  --input testfiles/Dog.webp \
+  testfiles/Dog.webp \
   --output output/Dog_with_ingredients.webp \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \
@@ -460,8 +457,7 @@ Extract a manifest from a signed file:
 
 ```bash
 ./target/release/c2pa-testfile-maker \
-  --extract \
-  --input output/Dog_signed.jpg \
+  -e output/Dog_signed.jpg \
   --output output/extracted_manifest.json
 ```
 

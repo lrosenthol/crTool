@@ -95,6 +95,29 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Extract Dog",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=c2pa-testfile-maker",
+                    "--package=c2pa-testfile-maker"
+                ],
+                "filter": {
+                    "name": "c2pa-testfile-maker",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "-e",
+                "target/test_output/individual/Dog_simple.jpg",
+                "-o",
+                "target/output/extract_output.json"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests",
             "cargo": {
                 "args": [

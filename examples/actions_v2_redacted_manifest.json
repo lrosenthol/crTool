@@ -12,6 +12,11 @@
             "data": {
                 "actions": [
                     {
+                        "action": "c2pa.opened",
+                        "when": "2024-01-07T10:00:00Z",
+                        "softwareAgentIndex": 0
+                    },
+                    {
                         "action": "c2pa.redacted",
                         "when": "2024-01-07T16:45:00Z",
                         "softwareAgent": {
