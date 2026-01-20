@@ -55,6 +55,12 @@ pub fn sign_file_with_manifest(
     // Create the builder from JSON
     let mut builder = Builder::from_json(&manifest_json)?;
 
+    // Process any ingredients_from_files that may be in the manifest
+    // Use the manifest's directory as the base for resolving ingredient paths
+    let ingredients_base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+
+    process_ingredients_with_thumbnails(&mut builder, &manifest_json, ingredients_base_dir, false)?;
+
     // Use the same test signer approach as c2pa-rs tests
     let signer = test_signer();
 
@@ -223,6 +229,12 @@ fn process_ingredients_with_thumbnails(
                     _ => anyhow::bail!("Invalid relationship type: {}", rel),
                 };
                 ingredient.set_relationship(relationship);
+            }
+
+            // Set the label (instance_id) if provided
+            // This allows the ingredient to be referenced in actions by this label
+            if let Some(label) = ingredient_def.get("label").and_then(|v| v.as_str()) {
+                ingredient.set_instance_id(label);
             }
 
             // Generate thumbnail if requested and not already present

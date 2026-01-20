@@ -184,6 +184,47 @@ fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(St
 }
 
 /// Process ingredients from manifest JSON and add them to the builder
+/// Helper function to load an ingredient from a file path
+fn load_ingredient_from_file(file_path: &Path, generate_thumbnail: bool) -> Result<Ingredient> {
+    if !file_path.exists() {
+        anyhow::bail!("Ingredient file not found: {:?}", file_path);
+    }
+
+    println!("  Loading ingredient: {:?}", file_path);
+
+    // Load the ingredient file
+    let mut source = fs::File::open(file_path)
+        .context(format!("Failed to open ingredient file: {:?}", file_path))?;
+
+    // Determine format from file extension
+    let extension = file_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .context(format!("Ingredient file has no extension: {:?}", file_path))?;
+
+    let format = extension_to_mime(extension)
+        .context(format!("Unsupported ingredient file format: {}", extension))?;
+
+    // Create an Ingredient from the file
+    let mut ingredient = Ingredient::from_stream(format, &mut source).context(format!(
+        "Failed to create ingredient from file: {:?}",
+        file_path
+    ))?;
+
+    // Generate thumbnail if requested and not already present
+    if generate_thumbnail && ingredient.thumbnail_ref().is_none() {
+        use std::io::Seek;
+        source.rewind()?;
+        let (thumb_format, thumbnail) = make_thumbnail_from_stream(format, &mut source)
+            .context("Failed to generate thumbnail for ingredient")?;
+        ingredient
+            .set_thumbnail(&thumb_format, thumbnail)
+            .context("Failed to set thumbnail for ingredient")?;
+    }
+
+    Ok(ingredient)
+}
+
 /// Returns the number of ingredients processed from files
 fn process_ingredients(
     builder: &mut Builder,
@@ -197,7 +238,9 @@ fn process_ingredients(
 
     let mut count = 0;
 
-    // Look for "ingredients_from_files" field (separate from standard "ingredients")
+    // Look for "ingredients_from_files" field (detailed ingredient configuration)
+    // This field allows loading ingredients from external files while still being able to
+    // reference them in actions via an optional instance_id field
     if let Some(ingredients) = manifest
         .get("ingredients_from_files")
         .and_then(|v| v.as_array())
@@ -218,34 +261,7 @@ fn process_ingredients(
                 ingredients_base_dir.join(file_path_str)
             };
 
-            if !file_path.exists() {
-                anyhow::bail!(
-                    "Ingredient file not found: {} (resolved to: {:?})",
-                    file_path_str,
-                    file_path
-                );
-            }
-
-            println!("  Loading ingredient: {:?}", file_path);
-
-            // Load the ingredient file
-            let mut source = fs::File::open(&file_path)
-                .context(format!("Failed to open ingredient file: {:?}", file_path))?;
-
-            // Determine format from file extension
-            let extension = file_path
-                .extension()
-                .and_then(|s| s.to_str())
-                .context(format!("Ingredient file has no extension: {:?}", file_path))?;
-
-            let format = extension_to_mime(extension)
-                .context(format!("Unsupported ingredient file format: {}", extension))?;
-
-            // Create an Ingredient from the file
-            let mut ingredient = Ingredient::from_stream(format, &mut source).context(format!(
-                "Failed to create ingredient from file: {:?}",
-                file_path
-            ))?;
+            let mut ingredient = load_ingredient_from_file(&file_path, generate_thumbnails)?;
 
             // Set the title if provided in the manifest
             if let Some(title) = ingredient_def.get("title").and_then(|v| v.as_str()) {
@@ -271,15 +287,10 @@ fn process_ingredients(
                 ingredient.set_relationship(relationship);
             }
 
-            // Generate thumbnail if requested and not already present
-            if generate_thumbnails && ingredient.thumbnail_ref().is_none() {
-                use std::io::Seek;
-                source.rewind()?;
-                let (thumb_format, thumbnail) = make_thumbnail_from_stream(format, &mut source)
-                    .context("Failed to generate thumbnail for ingredient")?;
-                ingredient
-                    .set_thumbnail(&thumb_format, thumbnail)
-                    .context("Failed to set thumbnail for ingredient")?;
+            // Set the label (instance_id) if provided
+            // This allows the ingredient to be referenced in actions by this label
+            if let Some(label) = ingredient_def.get("label").and_then(|v| v.as_str()) {
+                ingredient.set_instance_id(label);
             }
 
             // Add the ingredient to the builder

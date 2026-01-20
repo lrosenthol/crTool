@@ -16,7 +16,7 @@
                         "when": "2026-01-17T14:44:19.231Z",
                         "parameters": {
                             "ingredientIds": [
-                                "test_ingredient.png"
+                                "test_ingredient"
                             ]
                         }
                     }
@@ -25,7 +25,11 @@
             "created": true
         }
     ],
-    "ingredient_paths": [
-        "test_ingredient.png"
+    "ingredients_from_files": [
+        {
+            "file_path": "test_ingredient_manifest.jpg",
+            "label": "test_ingredient",
+            "relationship": "parentOf"
+        }
     ]
 }
