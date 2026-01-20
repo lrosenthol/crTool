@@ -1994,6 +1994,7 @@ fn test_testset_manifests() -> Result<()> {
         "p-actions-opened-manifest",
         "p-actions-opened-no-manifest",
         "p-actions-placed",
+        "p-actions-placed-manifest",
         "p-actions-translated",
         // "p-actions-redacted",
         "p-actions-softwareAgents",

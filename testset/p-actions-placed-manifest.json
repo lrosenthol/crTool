@@ -5,7 +5,7 @@
             "version": "0.1.0"
         }
     ],
-    "title": "p-actions-watermarked-unbound",
+    "title": "p-actions-placed-manifest",
     "assertions": [
         {
             "label": "c2pa.actions",
@@ -17,14 +17,24 @@
                         "when": "2026-01-17T14:44:19.231Z"
                     },
                     {
-                        "action": "c2pa.watermarked.unbound",
+                        "action": "c2pa.placed",
                         "when": "2026-01-17T15:44:19.231Z",
-                        "parameters": {}
+                        "parameters": {
+                            "ingredientIds": [
+                                "test_ingredient"
+                            ]
+                        }
                     }
                 ]
             },
             "created": true
         }
     ],
-    "ingredients": []
+    "ingredients_from_files": [
+        {
+            "file_path": "test_ingredient_manifest.jpg",
+            "label": "test_ingredient",
+            "relationship": "componentOf"
+        }
+    ]
 }
