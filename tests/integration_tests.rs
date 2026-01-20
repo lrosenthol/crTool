@@ -2027,6 +2027,14 @@ fn test_testset_manifests() -> Result<()> {
             testset_dir().join("n-actions-redacted-no-reason.json"),
         ),
         (
+            "n-actions-watermarked-bound",
+            testset_dir().join("n-actions-watermarked-bound.json"),
+        ),
+        (
+            "n-actions-softwareAgent-missing",
+            testset_dir().join("n-actions-softwareAgent-missing.json"),
+        ),
+        (
             "p-actions-created",
             testset_dir().join("p-actions-created.json"),
         ),
@@ -2054,6 +2062,22 @@ fn test_testset_manifests() -> Result<()> {
         //     "p-actions-redacted",
         //     testset_dir().join("p-actions-redacted.json"),
         // ),
+        (
+            "p-actions-softwareAgents",
+            testset_dir().join("p-actions-softwareAgents.json"),
+        ),
+        (
+            "p-actions-changes-spatial",
+            testset_dir().join("p-actions-changes-spatial.json"),
+        ),
+        (
+            "p-actions-watermarked-unbound",
+            testset_dir().join("p-actions-watermarked-unbound.json"),
+        ),
+        (
+            "p-actions-watermarked-bound",
+            testset_dir().join("p-actions-watermarked-bound.json"),
+        ),
     ];
 
     let mut success_count = 0;

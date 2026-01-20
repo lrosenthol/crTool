@@ -1,0 +1,43 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "n-actions-placed",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    },
+                    {
+                        "action": "c2pa.watermarked.bound",
+                        "when": "2026-01-17T15:44:19.231Z",
+                        "parameters": {}
+                    }
+                ]
+            },
+            "created": true
+        },
+        {
+            "label": "c2pa.soft-binding",
+            "data": {
+                "alg": "com.example.watermark.v1",
+                "blocks": [
+                    {
+                        "scope": {},
+                        "value": "0x0123456789abcdef"
+                    }
+                ],
+                "name": "Sample soft binding for watermark region"
+            }
+        }
+    ],
+    "ingredients": []
+}

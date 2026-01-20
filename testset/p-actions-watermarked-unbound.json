@@ -1,0 +1,30 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "n-actions-placed",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    },
+                    {
+                        "action": "c2pa.watermarked.unbound",
+                        "when": "2026-01-17T15:44:19.231Z",
+                        "parameters": {}
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

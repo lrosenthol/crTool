@@ -1,0 +1,50 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "p-actions-changes-spatial",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    },
+                    {
+                        "action": "c2pa.edited",
+                        "when": "2026-01-18T10:22:15.123Z",
+                        "changes": [
+                            {
+                                "region": [
+                                    {
+                                        "type": "spatial",
+                                        "shape": {
+                                            "type": "rectangle",
+                                            "unit": "pixel",
+                                            "origin": {
+                                                "x": 100.0,
+                                                "y": 150.0
+                                            },
+                                            "width": 400.0,
+                                            "height": 300.0
+                                        }
+                                    }
+                                ],
+                                "name": "Sky adjustment",
+                                "description": "Color correction applied to sky region"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

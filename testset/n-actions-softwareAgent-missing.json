@@ -1,0 +1,41 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "p-actions-softwareAgents",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "softwareAgents": [
+                    {
+                        "name": "Adobe Photoshop",
+                        "version": "24.0.0"
+                    },
+                    {
+                        "name": "Custom Image Tool",
+                        "version": "1.5.2"
+                    }
+                ],
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "softwareAgentIndex": 0,
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    },
+                    {
+                        "action": "c2pa.edited",
+                        "softwareAgentIndex": 2,
+                        "when": "2026-01-18T10:22:15.123Z"
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}
