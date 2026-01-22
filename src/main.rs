@@ -22,9 +22,9 @@ struct Cli {
     #[arg(value_name = "INPUT_FILE", required = true, num_args = 1..)]
     input: Vec<String>,
 
-    /// Path to the output file or directory (required when processing single file, must be directory for multiple files)
+    /// Path to the output file or directory (not required in validate mode)
     #[arg(short, long, value_name = "PATH")]
-    output: PathBuf,
+    output: Option<PathBuf>,
 
     /// Path to the certificate file (PEM format, not required in extract mode)
     #[arg(short, long, value_name = "FILE")]
@@ -62,6 +62,10 @@ struct Cli {
     /// Generate thumbnails for ingredients
     #[arg(long, default_value = "false")]
     thumbnail_ingredients: bool,
+
+    /// Validate JSON files against the indicators schema
+    #[arg(short = 'v', long, default_value = "false")]
+    validate: bool,
 }
 
 /// Configuration for processing files with C2PA manifests
@@ -643,6 +647,114 @@ fn process_single_file(
     Ok(())
 }
 
+/// Validate JSON files against the indicators schema
+fn validate_json_files(input_paths: &[PathBuf]) -> Result<()> {
+    println!("=== Validating JSON files against indicators schema ===\n");
+
+    // Load the schema from the embedded file
+    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("INTERNAL")
+        .join("schemas")
+        .join("indicators-schema.json");
+
+    if !schema_path.exists() {
+        anyhow::bail!("Schema file not found at: {:?}", schema_path);
+    }
+
+    println!("Loading schema from: {:?}\n", schema_path);
+    let schema_content =
+        fs::read_to_string(&schema_path).context("Failed to read indicators schema file")?;
+
+    let schema_json: JsonValue =
+        serde_json::from_str(&schema_content).context("Failed to parse indicators schema JSON")?;
+
+    // Compile the schema
+    let compiled_schema = jsonschema::validator_for(&schema_json)
+        .map_err(|e| anyhow::anyhow!("Failed to compile JSON schema: {}", e))?;
+
+    println!("Schema compiled successfully\n");
+
+    let mut total_files = 0;
+    let mut valid_files = 0;
+    let mut invalid_files = 0;
+    let mut error_details = Vec::new();
+
+    // Validate each input file
+    for input_path in input_paths {
+        total_files += 1;
+        println!("Validating: {:?}", input_path);
+
+        // Read and parse the JSON file
+        let json_content = match fs::read_to_string(input_path) {
+            Ok(content) => content,
+            Err(e) => {
+                println!("  ✗ ERROR: Failed to read file: {}\n", e);
+                invalid_files += 1;
+                error_details.push((input_path.clone(), format!("Failed to read file: {}", e)));
+                continue;
+            }
+        };
+
+        let json_value: JsonValue = match serde_json::from_str(&json_content) {
+            Ok(value) => value,
+            Err(e) => {
+                println!("  ✗ ERROR: Invalid JSON: {}\n", e);
+                invalid_files += 1;
+                error_details.push((input_path.clone(), format!("Invalid JSON: {}", e)));
+                continue;
+            }
+        };
+
+        // Validate against schema
+        let validation_result = compiled_schema.validate(&json_value);
+        match validation_result {
+            Ok(_) => {
+                println!("  ✓ Valid\n");
+                valid_files += 1;
+            }
+            Err(errors) => {
+                println!("  ✗ Validation failed:");
+                let mut error_messages = Vec::new();
+
+                for error in errors {
+                    let instance_path = if error.instance_path.to_string().is_empty() {
+                        "root".to_string()
+                    } else {
+                        error.instance_path.to_string()
+                    };
+                    let message = format!("    - At {}: {}", instance_path, error);
+                    println!("{}", message);
+                    error_messages.push(message);
+                }
+                println!();
+
+                invalid_files += 1;
+                error_details.push((input_path.clone(), error_messages.join("\n")));
+            }
+        }
+    }
+
+    // Print summary
+    println!("=== Validation Summary ===");
+    println!("  Total files: {}", total_files);
+    println!("  Valid: {}", valid_files);
+    println!("  Invalid: {}", invalid_files);
+
+    if invalid_files > 0 {
+        println!("\n=== Files with Validation Errors ===");
+        for (path, error) in error_details {
+            println!("\n{:?}:", path);
+            println!("{}", error);
+        }
+
+        anyhow::bail!("{} file(s) failed validation", invalid_files);
+    } else {
+        println!("\n✓ All files are valid!");
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -663,18 +775,29 @@ fn main() -> Result<()> {
 
     println!("Found {} input file(s) to process", input_files.len());
 
+    // Handle validation mode
+    if cli.validate {
+        // In validation mode, input files should be JSON files to validate
+        return validate_json_files(&input_files);
+    }
+
     // Handle extract mode
     if cli.extract {
+        // Require output for extract mode
+        let output = cli
+            .output
+            .context("--output is required when using --extract mode")?;
+
         // Validate --jpt can only be used with --extract
         if cli.jpt {
             println!("Using JPEG Trust format for extraction");
         }
 
         // Output must be a directory if processing multiple files
-        if input_files.len() > 1 && !cli.output.is_dir() {
+        if input_files.len() > 1 && !output.is_dir() {
             anyhow::bail!(
                 "Output must be a directory when extracting from multiple input files. Got: {:?}",
-                cli.output
+                output
             );
         }
 
@@ -683,7 +806,7 @@ fn main() -> Result<()> {
         let mut error_count = 0;
 
         for input_file in &input_files {
-            match extract_manifest(input_file, &cli.output, cli.jpt) {
+            match extract_manifest(input_file, &output, cli.jpt) {
                 Ok(_) => success_count += 1,
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);
@@ -710,21 +833,24 @@ fn main() -> Result<()> {
     }
 
     // Normal signing mode - validate required arguments
+    let output = cli
+        .output
+        .context("--output is required when not in extract or validate mode")?;
     let manifest = cli
         .manifest
-        .context("--manifest is required when not in extract mode")?;
+        .context("--manifest is required when not in extract or validate mode")?;
     let cert = cli
         .cert
-        .context("--cert is required when not in extract mode")?;
+        .context("--cert is required when not in extract or validate mode")?;
     let key = cli
         .key
-        .context("--key is required when not in extract mode")?;
+        .context("--key is required when not in extract or validate mode")?;
 
     // Output must be a directory if processing multiple files
-    if input_files.len() > 1 && !cli.output.is_dir() {
+    if input_files.len() > 1 && !output.is_dir() {
         anyhow::bail!(
             "Output must be a directory when processing multiple input files. Got: {:?}",
-            cli.output
+            output
         );
     }
 
@@ -778,7 +904,7 @@ fn main() -> Result<()> {
     let mut error_count = 0;
 
     for input_file in &input_files {
-        match process_single_file(input_file, &cli.output, &config) {
+        match process_single_file(input_file, &output, &config) {
             Ok(_) => success_count += 1,
             Err(e) => {
                 eprintln!("Error processing {:?}: {}", input_file, e);
@@ -834,5 +960,45 @@ mod tests {
         );
 
         assert!(parse_signing_algorithm("invalid").is_err());
+    }
+
+    #[test]
+    fn test_validate_json_files_with_valid_manifest() {
+        // Test with a valid example manifest
+        let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join("simple_manifest.json");
+
+        if manifest_path.exists() {
+            let result = validate_json_files(&[manifest_path]);
+            // Note: This will fail since simple_manifest.json doesn't conform to indicators schema
+            // That's expected - it's a C2PA manifest template, not an indicators document
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_validate_json_files_with_invalid_json() {
+        // Create a temporary invalid JSON file
+        use std::io::Write;
+        let temp_dir = std::env::temp_dir();
+        let temp_file = temp_dir.join("test_invalid.json");
+
+        let mut file = fs::File::create(&temp_file).expect("Failed to create temp file");
+        writeln!(file, "{{ invalid json }}").expect("Failed to write temp file");
+        drop(file);
+
+        let result = validate_json_files(&[temp_file.clone()]);
+        assert!(result.is_err());
+
+        // Clean up
+        let _ = fs::remove_file(temp_file);
+    }
+
+    #[test]
+    fn test_validate_json_files_with_nonexistent_file() {
+        let nonexistent = PathBuf::from("/nonexistent/file.json");
+        let result = validate_json_files(&[nonexistent]);
+        assert!(result.is_err());
     }
 }

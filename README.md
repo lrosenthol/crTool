@@ -9,6 +9,8 @@ A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/conten
 - 🖼️ Support for multiple media formats (JPEG, PNG, and more)
 - 📁 Flexible output options (specific file or directory)
 - 🧩 **File-based ingredient loading** - automatically load and embed parent/component ingredients from files
+- 📤 **Extract manifests** - extract C2PA manifests from signed files to JSON (standard or JPEG Trust format)
+- ✅ **JSON Schema validation** - validate extracted manifests or indicators documents against the JPEG Trust schema
 - ⚡ Built with Rust for performance and safety
 
 ## Installation
@@ -74,10 +76,10 @@ c2pa-testfile-maker \
 ### Options
 
 - `<INPUT_FILE>...`: Path(s) to input media asset(s) (JPEG, PNG, etc.) (required). Supports multiple files and glob patterns (e.g., `*.jpg`, `images/*.png`)
-- `-m, --manifest <FILE>`: Path to the JSON manifest configuration file (required for signing, not needed for extract mode)
-- `-o, --output <PATH>`: Path to the output file or directory (required). When processing multiple files, output must be a directory
-- `-c, --cert <FILE>`: Path to the certificate file in PEM format (required for signing, not needed for extract mode)
-- `-k, --key <FILE>`: Path to the private key file in PEM format (required for signing, not needed for extract mode)
+- `-m, --manifest <FILE>`: Path to the JSON manifest configuration file (required for signing, not needed for extract or validate mode)
+- `-o, --output <PATH>`: Path to the output file or directory (required for signing and extract modes, not needed for validate mode). When processing multiple files, output must be a directory
+- `-c, --cert <FILE>`: Path to the certificate file in PEM format (required for signing, not needed for extract or validate mode)
+- `-k, --key <FILE>`: Path to the private key file in PEM format (required for signing, not needed for extract or validate mode)
 - `-a, --algorithm <ALGORITHM>`: Signing algorithm (optional, auto-detected from certificate if not specified)
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
   - Auto-detection examines the certificate to determine the appropriate algorithm
@@ -88,6 +90,11 @@ c2pa-testfile-maker \
   - Includes computed asset hash in `asset_info`
   - Formats manifests as an array instead of an object
   - Different validation status structure compared to standard format
+- `-v, --validate`: Validate JSON files against the JPEG Trust indicators schema
+  - Validates one or more JSON files against the schema at `INTERNAL/schemas/indicators-schema.json`
+  - Useful for validating extracted manifests or custom indicators documents
+  - Provides detailed error messages for validation failures
+  - Returns exit code 0 if all files are valid, non-zero otherwise
 - `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
   - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
   - Bypasses certificate chain validation during signer creation
@@ -251,6 +258,83 @@ In extract mode:
   - `manifests` as an array (not an object)
   - Different validation status structure
   - Compatible with JPEG Trust consumers and validators
+
+
+### Validating JSON Files
+
+The tool can validate JSON files against the JPEG Trust indicators schema. This is useful for:
+- Verifying extracted manifests conform to the indicators specification
+- Validating custom indicators documents before processing
+- Checking JSON files for compliance with the JPEG Trust standard
+
+```bash
+# Validate a single JSON file
+./target/release/c2pa-testfile-maker \
+  --validate extracted_manifest.json
+
+# Validate multiple JSON files
+./target/release/c2pa-testfile-maker \
+  --validate manifest1.json manifest2.json manifest3.json
+
+# Validate using glob patterns
+./target/release/c2pa-testfile-maker \
+  --validate "manifests/*.json"
+```
+
+In validation mode:
+- No `--output` flag is required (validation doesn't produce any files)
+- The tool loads the indicators schema from `INTERNAL/schemas/indicators-schema.json`
+- Each input file is validated against the schema
+- Detailed error messages are provided for validation failures, including:
+  - The path in the JSON where the error occurred
+  - A description of what is invalid
+- The tool exits with code 0 if all files are valid, non-zero otherwise
+- A summary report is displayed showing the number of valid and invalid files
+
+Example output for a valid file:
+```
+=== Validating JSON files against indicators schema ===
+
+Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+
+Schema compiled successfully
+
+Validating: "manifest.json"
+  ✓ Valid
+
+=== Validation Summary ===
+  Total files: 1
+  Valid: 1
+  Invalid: 0
+
+✓ All files are valid!
+```
+
+Example output for an invalid file:
+```
+=== Validating JSON files against indicators schema ===
+
+Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+
+Schema compiled successfully
+
+Validating: "invalid_manifest.json"
+  ✗ Validation failed:
+    - At /asset_info: "hash" is a required property
+    - At /manifests/0/claim.v2/version: "string" is not of types "integer", "null"
+
+=== Validation Summary ===
+  Total files: 1
+  Valid: 0
+  Invalid: 1
+
+=== Files with Validation Errors ===
+
+"invalid_manifest.json":
+    - At /asset_info: "hash" is a required property
+    - At /manifests/0/claim.v2/version: "string" is not of types "integer", "null"
+Error: 1 file(s) failed validation
+```
 
 
 ### Algorithm Auto-Detection
@@ -495,6 +579,19 @@ Extract a manifest from a signed file:
   --output output/extracted_manifest.json
 ```
 
+Validate JSON files against the indicators schema:
+
+```bash
+# Validate a single file
+./target/release/c2pa-testfile-maker --validate manifest.json
+
+# Validate multiple files
+./target/release/c2pa-testfile-maker --validate file1.json file2.json
+
+# Validate with glob patterns
+./target/release/c2pa-testfile-maker --validate "manifests/*.json"
+```
+
 ## Architecture
 
 The tool is structured as follows:
@@ -520,6 +617,7 @@ Key dependencies:
 - [c2pa](https://crates.io/crates/c2pa) - C2PA manifest creation and signing
 - [clap](https://crates.io/crates/clap) - Command-line argument parsing
 - [serde](https://crates.io/crates/serde) & [serde_json](https://crates.io/crates/serde_json) - JSON handling
+- [jsonschema](https://crates.io/crates/jsonschema) - JSON Schema validation
 - [anyhow](https://crates.io/crates/anyhow) - Error handling
 
 ## License

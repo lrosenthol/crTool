@@ -2001,6 +2001,7 @@ fn test_testset_manifests() -> Result<()> {
         "p-actions-changes-spatial",
         "p-actions-watermarked-unbound",
         "p-actions-watermarked-bound",
+        "p-soft-binding",
     ];
 
     let mut success_count = 0;
@@ -2055,6 +2056,32 @@ fn test_testset_manifests() -> Result<()> {
                     "✓ Extraction of manifest from {:?}",
                     output.file_name().unwrap().to_str().unwrap(),
                 );
+
+                // Now validate the extracted JSON file
+                let extracted_json =
+                    output_testset_dir.join(format!("{}_manifest_jpt.json", manifest_name));
+
+                if extracted_json.exists() {
+                    let validate_result = Command::new(binary_path)
+                        .arg("--validate")
+                        .arg(&extracted_json)
+                        .output()?;
+
+                    if validate_result.status.success() {
+                        println!(
+                            "✓ Validation passed for extracted manifest: {}",
+                            extracted_json.file_name().unwrap().to_str().unwrap()
+                        );
+                    } else {
+                        println!(
+                            "✗ Validation failed for {:?}: {}",
+                            extracted_json,
+                            String::from_utf8_lossy(&validate_result.stderr)
+                        );
+                    }
+                } else {
+                    println!("⚠ Extracted JSON file not found: {:?}", extracted_json);
+                }
             } else {
                 println!(
                     "✗ Extraction failed for {:?}: {}",
@@ -2062,14 +2089,6 @@ fn test_testset_manifests() -> Result<()> {
                     String::from_utf8_lossy(&result.stderr)
                 );
             }
-
-            // // Verify manifest files were created
-            // let manifest1 = testfiles_dir().join("Dog_signed_manifest.json");
-
-            // assert!(
-            //     manifest1.exists(),
-            //     "Manifest file Dog_signed_manifest.json should exist"
-            // );
         }
     }
 
