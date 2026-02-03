@@ -2004,6 +2004,7 @@ fn test_testset_manifests() -> Result<()> {
         "n-actions-softwareAgent-missing",
         "n-actions-softwareAgent-and-index",
         "p-actions-created",
+        "p-actions-created-with-custom",
         "p-actions-opened-manifest",
         "p-actions-opened-no-manifest",
         "p-actions-opened-no-manifest-metadata",
