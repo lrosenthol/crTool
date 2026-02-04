@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get started with C2PA Testfile Maker in 5 minutes!
+Get started with Content Credential Tool in 5 minutes!
 
 ## Step 1: Build the Tool
 
@@ -30,7 +30,7 @@ Or use any JPEG or PNG image you have.
 ## Step 4: Run the Tool
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   --input test.jpg \
   --output test_signed.jpg \
@@ -54,7 +54,7 @@ c2pa test_signed.jpg
 ## What's Next?
 
 1. **Customize manifests**: Edit the JSON files in `examples/` to match your use case
-2. **Try different examples**: 
+2. **Try different examples**:
    - `simple_manifest.json` - Basic manifest
    - `full_manifest.json` - Complete metadata
    - `with_ingredients.json` - Composite images
@@ -80,7 +80,7 @@ c2pa test_signed.jpg
 ### Original Creation
 ```bash
 # Mark an original photo with your authorship
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   --input original.jpg \
   --output signed_original.jpg \
@@ -91,7 +91,7 @@ c2pa test_signed.jpg
 ### Edited Content
 ```bash
 # Document editing history with full metadata
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/full_manifest.json \
   --input edited_photo.jpg \
   --output signed_edited.jpg \
@@ -104,7 +104,7 @@ c2pa test_signed.jpg
 # Process multiple files
 for file in input/*.jpg; do
   basename=$(basename "$file")
-  ./target/release/c2pa-testfile-maker \
+  ./target/release/crTool \
     --manifest examples/simple_manifest.json \
     --input "$file" \
     --output "output/$basename" \
@@ -117,8 +117,7 @@ done
 
 For more options:
 ```bash
-./target/release/c2pa-testfile-maker --help
+./target/release/crTool --help
 ```
 
 For detailed documentation, see [README.md](README.md).
-

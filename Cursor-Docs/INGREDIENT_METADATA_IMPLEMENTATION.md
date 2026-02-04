@@ -29,7 +29,7 @@ pub struct AssertionMetadata {
 - `additional_fields(&self) -> &HashMap<String, Value>` - Get all additional fields
 - `set_additional_fields(self, fields: HashMap<String, Value>) -> Self` - Set multiple fields at once
 
-### 2. c2pa-testfile-maker Implementation
+### 2. crTool Implementation
 
 #### Main CLI Processor
 

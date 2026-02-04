@@ -38,7 +38,7 @@ To use any of these examples with the tool:
 
 ```bash
 # Simple example
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   --input your_image.jpg \
   --output output.jpg \
@@ -46,7 +46,7 @@ To use any of these examples with the tool:
   --key your_key.pem
 
 # Full metadata example
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/full_manifest.json \
   --input your_image.jpg \
   --output output.jpg \
@@ -54,7 +54,7 @@ To use any of these examples with the tool:
   --key your_key.pem
 
 # With ingredients
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/with_ingredients.json \
   --input your_composite.jpg \
   --output output.jpg \

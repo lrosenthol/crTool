@@ -1173,7 +1173,7 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
         .expect("Should have softwareAgent");
 
     assert!(
-        extracted_agent.contains("c2pa-testfile-maker") || extracted_agent == original_agent,
+        extracted_agent.contains("crTool") || extracted_agent == original_agent,
         "Software agent should match or contain the original name. Original: {}, Extracted: {}",
         original_agent,
         extracted_agent
@@ -1193,14 +1193,11 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
     let has_our_generator = extracted_claim_gen.iter().any(|gen| {
         gen["name"]
             .as_str()
-            .map(|n| n.contains("c2pa-testfile-maker"))
+            .map(|n| n.contains("crTool"))
             .unwrap_or(false)
     });
 
-    assert!(
-        has_our_generator,
-        "Claim generator should include c2pa-testfile-maker"
-    );
+    assert!(has_our_generator, "Claim generator should include crTool");
 
     println!("✓ Round-trip test passed: manifest data preserved correctly");
     println!("  Original title: {}", original["title"]);
@@ -1717,7 +1714,7 @@ fn test_multiple_files_processing() -> Result<()> {
     let key = common::certs_dir().join("ed25519.pem");
 
     // Get the binary path
-    let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+    let binary_path = env!("CARGO_BIN_EXE_crTool");
 
     // Test processing multiple files explicitly
     let input1 = common::testfiles_dir().join("Dog.jpg");
@@ -1774,7 +1771,7 @@ fn test_glob_pattern_processing() -> Result<()> {
     let key = common::certs_dir().join("ed25519.pem");
 
     // Get the binary path
-    let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+    let binary_path = env!("CARGO_BIN_EXE_crTool");
 
     // Test processing files with glob pattern
     let testfiles = common::testfiles_dir();
@@ -1854,7 +1851,7 @@ fn test_multiple_files_extract() -> Result<()> {
     let extract_dir = common::output_dir().join("multi_extract_output");
     fs::create_dir_all(&extract_dir)?;
 
-    let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+    let binary_path = env!("CARGO_BIN_EXE_crTool");
 
     let result = Command::new(binary_path)
         .arg("--extract")
@@ -1901,7 +1898,7 @@ fn test_multi_file_error_handling() -> Result<()> {
     let key = common::certs_dir().join("ed25519.pem");
 
     // Get the binary path
-    let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+    let binary_path = env!("CARGO_BIN_EXE_crTool");
 
     // Test with one valid file and one non-existent file
     let input1 = common::testfiles_dir().join("Dog.jpg");
@@ -1941,7 +1938,7 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
     let key = common::certs_dir().join("ed25519.pem");
 
     // Get the binary path
-    let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+    let binary_path = env!("CARGO_BIN_EXE_crTool");
 
     let input1 = common::testfiles_dir().join("Dog.jpg");
     let input2 = common::testfiles_dir().join("Dog.png");
@@ -2078,7 +2075,7 @@ fn test_testset_manifests() -> Result<()> {
 
         {
             // Now extract the newly created manifest into JSON
-            let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+            let binary_path = env!("CARGO_BIN_EXE_crTool");
             let output_testset_dir = output_dir().join("testset");
 
             let result = Command::new(binary_path)

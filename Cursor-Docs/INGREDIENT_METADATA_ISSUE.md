@@ -35,7 +35,7 @@ The `AssertionMetadata` struct was enhanced to support arbitrary key/value pairs
 
 **Location:** `c2pa-rs/sdk/src/assertions/assertion_metadata.rs`
 
-### Changes to c2pa-testfile-maker
+### Changes to crTool
 
 Updated ingredient processing in both locations to parse and set metadata:
 

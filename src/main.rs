@@ -22,7 +22,7 @@ use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
-/// C2PA Testfile Maker - Create and embed C2PA manifests into media assets
+/// Content Credential Tool - Create and embed C2PA manifests into media assets
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {

@@ -104,13 +104,13 @@ Created a new test file with 16 comprehensive tests covering:
 
 ```bash
 # Extract in standard format
-c2pa-testfile-maker -e signed.jpg -o manifest.json
+crTool -e signed.jpg -o manifest.json
 
 # Extract in JPEG Trust format
-c2pa-testfile-maker -e --jpt signed.jpg -o manifest_jpt.json
+crTool -e --jpt signed.jpg -o manifest_jpt.json
 
 # Extract multiple files in JPEG Trust format to directory
-c2pa-testfile-maker -e --jpt signed1.jpg signed2.jpg -o output_dir/
+crTool -e --jpt signed1.jpg signed2.jpg -o output_dir/
 ```
 
 ## Test Results

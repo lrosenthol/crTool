@@ -1,7 +1,7 @@
 # Project Structure
 
 ```
-c2pa-testfile-maker/
+crTool/
 ├── src/
 │   └── main.rs                    # Main CLI application
 ├── examples/
@@ -55,8 +55,8 @@ Three comprehensive JSON manifest examples:
 ## Build Artifacts
 
 The project builds to:
-- `target/release/c2pa-testfile-maker` - Optimized binary
-- `target/debug/c2pa-testfile-maker` - Debug binary
+- `target/release/crTool` - Optimized binary
+- `target/debug/crTool` - Debug binary
 
 ## Dependencies
 
@@ -69,7 +69,7 @@ Core dependencies:
 ## Usage Pattern
 
 ```
-c2pa-testfile-maker \
+crTool \
   --manifest <JSON_FILE> \
   --input <MEDIA_FILE> \
   --output <OUTPUT_PATH> \
@@ -89,4 +89,3 @@ For developers:
 1. Read src/main.rs for implementation details
 2. Extend manifest examples as needed
 3. Add new features following Rust best practices
-

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document summarizes the implementation of file-based ingredient support for the c2pa-testfile-maker tool.
+This document summarizes the implementation of file-based ingredient support for the crTool tool.
 
 ## Implementation Details
 
@@ -88,7 +88,7 @@ All 39 tests pass, including the 4 new ingredient-specific tests.
 
 ### Basic Usage with Ingredients
 ```bash
-c2pa-testfile-maker \
+crTool \
   --manifest examples/simple_with_ingredient.json \
   --input output.jpg \
   --output signed.jpg \
@@ -98,7 +98,7 @@ c2pa-testfile-maker \
 
 ### With Thumbnails
 ```bash
-c2pa-testfile-maker \
+crTool \
   --manifest examples/with_ingredients_from_files.json \
   --input output.jpg \
   --output signed.jpg \
@@ -110,7 +110,7 @@ c2pa-testfile-maker \
 
 ### Custom Ingredient Directory
 ```bash
-c2pa-testfile-maker \
+crTool \
   --manifest manifest.json \
   --input output.jpg \
   --output signed.jpg \

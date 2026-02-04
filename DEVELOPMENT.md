@@ -1,6 +1,6 @@
 # Development Setup
 
-This document covers the development workflow and tooling for the c2pa-testfile-maker project.
+This document covers the development workflow and tooling for the crTool project.
 
 ## Initial Setup
 
@@ -8,10 +8,10 @@ This document covers the development workflow and tooling for the c2pa-testfile-
 
 ```bash
 # Clone both repositories as siblings
-git clone https://github.com/lrosenthol/c2pa-testfile-maker.git
+git clone https://github.com/lrosenthol/crTool.git
 git clone https://github.com/contentauth/c2pa-rs.git
 
-cd c2pa-testfile-maker
+cd crTool
 ```
 
 ### 2. Install Git Hooks
@@ -169,7 +169,7 @@ Located in `scripts/`:
 Ensure c2pa-rs is cloned as a sibling directory:
 ```
 parent-directory/
-├── c2pa-testfile-maker/
+├── crTool/
 └── c2pa-rs/
 ```
 

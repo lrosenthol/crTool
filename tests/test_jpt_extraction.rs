@@ -42,7 +42,7 @@ fn generate_extraction_output(input: &str, use_jpt: bool, subdir: &str) -> PathB
 
 /// Get the binary path for the CLI tool
 fn get_binary_path() -> String {
-    env!("CARGO_BIN_EXE_c2pa-testfile-maker").to_string()
+    env!("CARGO_BIN_EXE_crTool").to_string()
 }
 
 // ============================================================================

@@ -44,7 +44,7 @@ You can still verify the tool works by:
 
 1. Testing the CLI directly with your images:
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   --input testfiles/Dog.jpg \
   --output output/Dog_simple.jpg \
@@ -99,7 +99,7 @@ If you don't have valid certificates, you can manually test the functionality:
 for img in testfiles/*.{jpg,png,webp}; do
   base=$(basename "$img" | sed 's/\.[^.]*$//')
   ext="${img##*.}"
-  ./target/release/c2pa-testfile-maker \
+  ./target/release/crTool \
     --manifest examples/simple_manifest.json \
     --input "$img" \
     --output "output/${base}_simple.${ext}" \

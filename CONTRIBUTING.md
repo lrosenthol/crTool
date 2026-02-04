@@ -1,6 +1,6 @@
-# Contributing to c2pa-testfile-maker
+# Contributing to crTool
 
-Thank you for your interest in contributing to c2pa-testfile-maker! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to crTool! This document provides guidelines and instructions for contributing.
 
 ## Getting Started
 
@@ -8,11 +8,11 @@ Thank you for your interest in contributing to c2pa-testfile-maker! This documen
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/c2pa-testfile-maker.git
-cd c2pa-testfile-maker
+git clone https://github.com/YOUR_USERNAME/crTool.git
+cd crTool
 
 # Add the upstream repository
-git remote add upstream https://github.com/lrosenthol/c2pa-testfile-maker.git
+git remote add upstream https://github.com/lrosenthol/crTool.git
 ```
 
 ### 2. Set Up Dependencies
@@ -21,7 +21,7 @@ git remote add upstream https://github.com/lrosenthol/c2pa-testfile-maker.git
 # Clone the required c2pa-rs dependency as a sibling directory
 cd ..
 git clone https://github.com/contentauth/c2pa-rs.git
-cd c2pa-testfile-maker
+cd crTool
 ```
 
 ### 3. Install Development Tools
@@ -132,7 +132,7 @@ cargo test --release
    git push origin feature/your-feature-name
    ```
 
-2. **Create a Pull Request** on GitHub from your fork to `lrosenthol/c2pa-testfile-maker:main`
+2. **Create a Pull Request** on GitHub from your fork to `lrosenthol/crTool:main`
 
 3. **Fill out the PR template** (if available) with:
    - Description of changes
@@ -194,18 +194,19 @@ fn process_file(path: &Path) -> Data {
 /// # Example
 ///
 /// ```no_run
-/// # use c2pa_testfile_maker::*;
+/// # use crTool::*;
 /// process_manifest(manifest, input, output)?;
 /// ```
 pub fn process_manifest(manifest: &str, input: &Path, output: &Path) -> Result<()> {
     // Implementation
 }
 ```
+```
 
 ## Project Structure
 
 ```
-c2pa-testfile-maker/
+crTool/
 ├── .git-hooks/          # Git hooks (run via scripts/install-hooks.sh)
 ├── .github/             # GitHub Actions workflows
 ├── examples/            # Example manifests and test certificates
@@ -247,7 +248,7 @@ RUST_BACKTRACE=1 cargo run -- [args]
 RUST_BACKTRACE=full cargo run -- [args]
 
 # Use a debugger (requires rust-lldb or rust-gdb)
-rust-lldb target/debug/c2pa-testfile-maker
+rust-lldb target/debug/crTool
 ```
 
 ### Performance Profiling
@@ -257,11 +258,11 @@ rust-lldb target/debug/c2pa-testfile-maker
 cargo build --release
 
 # Profile with perf (Linux)
-perf record ./target/release/c2pa-testfile-maker [args]
+perf record ./target/release/crTool [args]
 perf report
 
 # Profile with Instruments (macOS)
-instruments -t "Time Profiler" ./target/release/c2pa-testfile-maker [args]
+instruments -t "Time Profiler" ./target/release/crTool [args]
 ```
 
 ## Getting Help
@@ -295,4 +296,4 @@ Contributors will be recognized in:
 - Release notes for significant contributions
 - README.md (for major features)
 
-Thank you for contributing to c2pa-testfile-maker! 🎉
+Thank you for contributing to crTool! 🎉

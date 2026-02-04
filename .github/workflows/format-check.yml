@@ -2,59 +2,58 @@ name: Format Check & Auto-fix
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   push:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
   format-check:
     name: Check Formatting
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      
+
       - name: Check formatting
         run: cargo fmt --all -- --check
-      
+
       - name: Show formatting diff (if failed)
         if: failure()
         run: |
           echo "❌ Code is not properly formatted!"
           echo "Run 'cargo fmt' locally to fix formatting."
           cargo fmt --all -- --check || true
-  
+
   clippy-check:
     name: Clippy Lints
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
-          path: c2pa-testfile-maker
-      
+          path: crTool
+
       - name: Checkout c2pa-rs
         uses: actions/checkout@v4
         with:
           repository: contentauth/c2pa-rs
           path: c2pa-rs
-      
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      
-      - name: Run clippy
-        working-directory: c2pa-testfile-maker
-        run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Run clippy
+        working-directory: crTool
+        run: cargo clippy --all-targets --all-features -- -D warnings

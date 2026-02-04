@@ -69,13 +69,13 @@ Updated documentation:
 
 ```bash
 # Validate a single file (no --output required)
-./target/release/c2pa-testfile-maker --validate manifest.json
+./target/release/crTool --validate manifest.json
 
 # Validate multiple files
-./target/release/c2pa-testfile-maker --validate file1.json file2.json
+./target/release/crTool --validate file1.json file2.json
 
 # Validate with glob patterns
-./target/release/c2pa-testfile-maker --validate "manifests/*.json"
+./target/release/crTool --validate "manifests/*.json"
 ```
 
 ## Example Output

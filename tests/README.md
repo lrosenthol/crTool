@@ -1,12 +1,12 @@
-# C2PA Testfile Maker - Tests (Updated for c2pa v0.74)
+# Content Credential Tool - Tests (Updated for c2pa v0.74)
 
 ## Overview
 
-Integration tests for the C2PA Testfile Maker tool. Tests verify that manifests can be embedded into various image formats (JPEG, PNG, WEBP) using different manifest configurations.
+Integration tests for the Content Credential Tool. Tests verify that manifests can be embedded into various image formats (JPEG, PNG, WEBP) using different manifest configurations.
 
 ## ✅ Working with c2pa v0.74 (Local Development)
 
-**The tests now work perfectly with self-signed certificates!** 
+**The tests now work perfectly with self-signed certificates!**
 
 By using the local c2pa-rs repository (path dependency), we have access to the same test infrastructure that c2patool uses, including the Ed25519 test certificates that pass all validation.
 
@@ -91,10 +91,10 @@ cd ../c2pa-rs/cli
 cargo install --path .
 
 # View manifest
-c2patool ../../c2pa-testfile-maker/target/test_output/Dog_simple.jpg
+c2patool ../../crTool/target/test_output/Dog_simple.jpg
 
 # Get JSON output
-c2patool ../../c2pa-testfile-maker/target/test_output/Dog_simple.jpg -o manifest.json
+c2patool ../../crTool/target/test_output/Dog_simple.jpg -o manifest.json
 ```
 
 ## Known Issues

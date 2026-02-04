@@ -1,13 +1,13 @@
 # Setup and Testing Guide
 
-This guide walks you through setting up the C2PA Testfile Maker repository and running tests.
+This guide walks you through setting up the Content Credential Tool repository and running tests.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 
 - **Rust 1.70+**: Install from [rustup.rs](https://rustup.rs/)
-- **C/C++ compiler**: 
+- **C/C++ compiler**:
   - macOS: Install Xcode Command Line Tools (`xcode-select --install`)
   - Linux: Install build-essential (`apt-get install build-essential`)
   - Windows: Install Visual Studio Build Tools
@@ -27,19 +27,19 @@ cd c2pa-projects
 # Clone c2pa-rs (the dependency)
 git clone https://github.com/contentauth/c2pa-rs.git
 
-# Clone c2pa-testfile-maker (this project)
-git clone https://github.com/lrosenthol/c2pa-testfile-maker.git
+# Clone crTool (this project)
+git clone https://github.com/lrosenthol/crTool.git
 
 # Your directory structure should look like:
 # c2pa-projects/
 #   ├── c2pa-rs/
-#   └── c2pa-testfile-maker/
+#   └── crTool/
 ```
 
 ### 2. Verify the Setup
 
 ```bash
-cd c2pa-testfile-maker
+cd crTool
 ./verify_setup.sh
 ```
 
@@ -62,8 +62,8 @@ cargo build --release
 ```
 
 The binary will be at:
-- Debug: `target/debug/c2pa-testfile-maker`
-- Release: `target/release/c2pa-testfile-maker`
+- Debug: `target/debug/crTool`
+- Release: `target/release/crTool`
 
 ## Running Tests
 
@@ -179,7 +179,7 @@ This creates self-signed certificates in `examples/certs/` for all supported alg
 cargo build --release
 
 # Test with simple manifest
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   --input testfiles/Dog.jpg \
   --output output/Dog_signed.jpg \
@@ -264,10 +264,9 @@ sudo dnf install pkg-config openssl-devel
 
 ## Getting Help
 
-- Check existing [Issues](https://github.com/lrosenthol/c2pa-testfile-maker/issues)
+- Check existing [Issues](https://github.com/lrosenthol/crTool/issues)
 - Create a new issue with:
   - Rust version (`rustc --version`)
   - OS and version
   - Steps to reproduce
   - Error messages or logs
-

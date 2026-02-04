@@ -1,4 +1,4 @@
-# C2PA Testfile Maker
+# Content Credential Tool
 
 A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/contentauth/c2pa-rs) library to create and embed C2PA (Coalition for Content Provenance and Authenticity) manifests into media assets based on JSON configuration files.
 
@@ -26,11 +26,11 @@ A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/conten
 
 ```bash
 # Clone both repositories as siblings
-git clone https://github.com/lrosenthol/c2pa-testfile-maker.git
+git clone https://github.com/lrosenthol/crTool.git
 git clone https://github.com/contentauth/c2pa-rs.git
 
 # Build the project
-cd c2pa-testfile-maker
+cd crTool
 
 # Install git hooks (recommended for contributors)
 ./scripts/install-hooks.sh
@@ -39,12 +39,12 @@ cd c2pa-testfile-maker
 cargo build --release
 ```
 
-The compiled binary will be available at `target/release/c2pa-testfile-maker`.
+The compiled binary will be available at `target/release/crTool`.
 
 **Directory Structure Required:**
 ```
 parent-directory/
-├── c2pa-testfile-maker/  (this repository)
+├── crTool/               (this repository)
 └── c2pa-rs/              (c2pa-rs SDK)
 ```
 
@@ -64,7 +64,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow informati
 ### Basic Command Structure
 
 ```bash
-c2pa-testfile-maker \
+crTool \
   --manifest <MANIFEST_JSON> \
   <INPUT_FILE(S)> \
   --output <OUTPUT_PATH> \
@@ -112,7 +112,7 @@ c2pa-testfile-maker \
 ### Example (Single File)
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   examples/sample.jpg \
   --output output/signed_sample.jpg \
@@ -126,7 +126,7 @@ Process multiple files with the same manifest:
 
 ```bash
 # Using explicit file list
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   testfiles/Dog.jpg testfiles/C.jpg \
   --output output/ \
@@ -135,7 +135,7 @@ Process multiple files with the same manifest:
   --allow-self-signed
 
 # Using glob patterns
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   "testfiles/*.jpg" \
   --output output/ \
@@ -144,7 +144,7 @@ Process multiple files with the same manifest:
   --allow-self-signed
 
 # Multiple glob patterns
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   "testfiles/*.jpg" "images/*.png" \
   --output output/ \
@@ -162,7 +162,7 @@ Note: The `--algorithm` parameter is optional. If not specified, the tool will a
 For development and testing, you can use the included test certificates with the `--allow-self-signed` flag:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   testfiles/Dog.jpg \
   --output output/Dog_signed.jpg \
@@ -179,7 +179,7 @@ For development and testing, you can use the included test certificates with the
 If the output path is a directory, the tool will create a file with the same name as the input file:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   examples/sample.jpg \
   --output output/ \
@@ -191,7 +191,7 @@ If the output path is a directory, the tool will create a file with the same nam
 When processing multiple files, output **must** be a directory:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   "testfiles/*.jpg" \
   --output output/ \
@@ -207,35 +207,35 @@ You can extract existing C2PA manifests from signed files using the `-e/--extrac
 
 ```bash
 # Extract from a single file to a specific file (standard format)
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e signed_image.jpg \
   --output manifest.json
 
 # Extract in JPEG Trust format
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e --jpt signed_image.jpg \
   --output manifest_jpt.json
 
 # Extract from a single file to a directory (auto-generates filename based on input)
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e signed_image.jpg \
   --output output_directory/
 # Creates: output_directory/signed_image_manifest.json
 
 # Extract in JPEG Trust format to a directory
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e --jpt signed_image.jpg \
   --output output_directory/
 # Creates: output_directory/signed_image_manifest_jpt.json
 
 # Extract from multiple files (output must be a directory)
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e "output/*.jpg" \
   --output manifests/
 # Creates: manifests/image1_manifest.json, manifests/image2_manifest.json, etc.
 
 # Extract from multiple files in JPEG Trust format
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e --jpt "output/*.jpg" \
   --output manifests/
 # Creates: manifests/image1_manifest_jpt.json, manifests/image2_manifest_jpt.json, etc.
@@ -269,15 +269,15 @@ The tool can validate JSON files against the JPEG Trust indicators schema. This 
 
 ```bash
 # Validate a single JSON file
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --validate extracted_manifest.json
 
 # Validate multiple JSON files
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --validate manifest1.json manifest2.json manifest3.json
 
 # Validate using glob patterns
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --validate "manifests/*.json"
 ```
 
@@ -348,7 +348,7 @@ The tool can automatically detect the signing algorithm from your certificate, e
 Example with auto-detection:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/manifest.json \
   examples/sample.jpg \
   --output output/signed_sample.jpg \
@@ -536,7 +536,7 @@ When your manifest includes `ingredients_from_files`, the tool will:
 Example command:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/with_ingredients_from_files.json \
   output/edited_photo.jpg \
   --output output/signed_with_ingredients.jpg \
@@ -549,7 +549,7 @@ Example command:
 To specify a custom base directory for ingredient paths:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest manifest.json \
   edited.jpg \
   --output signed.jpg \
@@ -614,7 +614,7 @@ See the `examples/` directory for:
 Create a signed image with a simple manifest:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/simple_manifest.json \
   testfiles/Dog.jpg \
   --output output/Dog_signed.jpg \
@@ -627,7 +627,7 @@ Create a signed image with a simple manifest:
 Create a signed image with ingredients and thumbnails:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   --manifest examples/with_ingredients_from_files.json \
   testfiles/Dog.webp \
   --output output/Dog_with_ingredients.webp \
@@ -642,7 +642,7 @@ Create a signed image with ingredients and thumbnails:
 Extract a manifest from a signed file:
 
 ```bash
-./target/release/c2pa-testfile-maker \
+./target/release/crTool \
   -e output/Dog_signed.jpg \
   --output output/extracted_manifest.json
 ```
@@ -651,13 +651,13 @@ Validate JSON files against the indicators schema:
 
 ```bash
 # Validate a single file
-./target/release/c2pa-testfile-maker --validate manifest.json
+./target/release/crTool --validate manifest.json
 
 # Validate multiple files
-./target/release/c2pa-testfile-maker --validate file1.json file2.json
+./target/release/crTool --validate file1.json file2.json
 
 # Validate with glob patterns
-./target/release/c2pa-testfile-maker --validate "manifests/*.json"
+./target/release/crTool --validate "manifests/*.json"
 ```
 
 ## Architecture

@@ -1,7 +1,7 @@
 {
     "claim_generator_info": [
         {
-            "name": "c2pa-testfile-maker/0.1.0",
+            "name": "crTool/0.1.0",
             "version": "0.1.0"
         }
     ],
@@ -15,7 +15,7 @@
                     {
                         "action": "c2pa.created",
                         "when": "2024-01-07T12:00:00Z",
-                        "softwareAgent": "c2pa-testfile-maker 0.1.0"
+                        "softwareAgent": "crTool 0.1.0"
                     }
                 ]
             }

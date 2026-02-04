@@ -1,11 +1,11 @@
 [package]
-name = "c2pa-testfile-maker"
-version = "0.1.0"
+name = "crTool"
+version = "0.2.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
-description = "A CLI tool to create and embed C2PA manifests into media assets using JSON configuration"
+description = "Content Credential Tool - A CLI tool to work with Content Credentials (C2PA Manifests)"
 license = "MIT"
-repository = "https://github.com/lrosenthol/c2pa-testfile-maker"
+repository = "https://github.com/lrosenthol/crTool"
 keywords = ["c2pa", "content-authenticity", "provenance", "media", "cli"]
 categories = ["command-line-utilities", "multimedia"]
 
@@ -22,7 +22,14 @@ p256 = { version = "0.13", features = ["ecdsa"] }
 rsa = { version = "0.9", features = ["sha2"] }
 x509-parser = "0.16"
 der-parser = "9.0"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] }
+image = { version = "0.25", default-features = false, features = [
+	"jpeg",
+	"png",
+	"gif",
+	"bmp",
+	"tiff",
+	"webp",
+] }
 glob = "0.3"
 jsonschema = "0.23"
 

@@ -1,4 +1,4 @@
-# Rustfmt configuration for c2pa-testfile-maker
+# Rustfmt configuration for crTool
 # See https://rust-lang.github.io/rustfmt/ for all options
 
 edition = "2021"

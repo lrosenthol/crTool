@@ -9,11 +9,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -39,11 +39,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -69,11 +69,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -99,11 +99,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -122,11 +122,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -146,11 +146,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=c2pa-testfile-maker",
-                    "--package=c2pa-testfile-maker"
+                    "--bin=crTool",
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "bin"
                 }
             },
@@ -177,10 +177,10 @@
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=c2pa-testfile-maker"
+                    "--package=crTool"
                 ],
                 "filter": {
-                    "name": "c2pa-testfile-maker",
+                    "name": "crTool",
                     "kind": "lib"
                 }
             },
@@ -196,7 +196,7 @@
                     "test",
                     "--no-run",
                     "--test=integration_tests",
-                    "--package=c2pa-testfile-maker"
+                    "--package=crTool"
                 ],
                 "filter": {
                     "name": "integration_tests",

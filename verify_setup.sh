@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🔍 Verifying C2PA Testfile Maker repository setup..."
+echo "🔍 Verifying Content Credential Tool repository setup..."
 echo ""
 
 # Check Rust is installed
@@ -79,5 +79,4 @@ echo "  cargo build --release      # Build release binary"
 echo "  cargo test                 # Run all tests"
 echo "  ./generate_test_certs.sh   # Generate test certificates"
 echo ""
-echo "Binary location: target/release/c2pa-testfile-maker"
-
+echo "Binary location: target/release/crTool"
