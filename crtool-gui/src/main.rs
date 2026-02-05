@@ -10,6 +10,9 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+// objc crate macros expand to cfg(cargo-clippy), which triggers unexpected_cfgs in security_scoped.
+#![allow(unexpected_cfgs)]
+
 use crtool::{
     default_schema_path, extract_jpt_manifest, validate_json_value, ManifestExtractionResult,
     ValidationResult,
@@ -18,11 +21,31 @@ use eframe::egui;
 use egui_twemoji::EmojiLabel;
 use std::path::PathBuf;
 
+#[cfg(target_os = "macos")]
+mod macos_open_document;
+mod security_scoped;
+
+/// Convert a command-line argument to a file path. Handles macOS `file://` URLs
+/// that the system may pass when opening via "Open With" or drop-on-icon.
+fn arg_to_path(arg: &str) -> PathBuf {
+    let arg = arg.trim();
+    if let Some(path_str) = arg.strip_prefix("file://") {
+        let path_str = path_str.trim_start_matches('/');
+        let decoded = urlencoding::decode(path_str).unwrap_or(std::borrow::Cow::Borrowed(path_str));
+        return PathBuf::from(decoded.as_ref());
+    }
+    PathBuf::from(arg)
+}
+
 fn main() -> Result<(), eframe::Error> {
+    #[cfg(target_os = "macos")]
+    macos_open_document::install_handler();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
-            .with_min_inner_size([800.0, 600.0]),
+            .with_min_inner_size([800.0, 600.0])
+            .with_drag_and_drop(true),
         ..Default::default()
     };
 
@@ -32,7 +55,17 @@ fn main() -> Result<(), eframe::Error> {
         Box::new(|cc| {
             // Required for egui-twemoji to load and render color emoji (SVG/PNG)
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(CrtoolApp::default()))
+            // Register Cocoa open-document handler (Dock drop, "Open With"). Must run after NSApp exists.
+            #[cfg(target_os = "macos")]
+            macos_open_document::install_cocoa_handler();
+            // Open file from command line (e.g. "open -a crTool file.jpg" or drop on app icon)
+            let initial_file = std::env::args().skip(1).find_map(|arg| {
+                let path = arg_to_path(&arg);
+                (path.is_file() && crtool::is_supported_asset_path(&path)).then_some(path)
+            });
+            #[cfg(target_os = "macos")]
+            let initial_file = initial_file.or_else(macos_open_document::take_pending_file);
+            Ok(Box::new(CrtoolApp::new_with_optional_file(initial_file)))
         }),
     )
 }
@@ -52,36 +85,58 @@ struct CrtoolApp {
 
 impl CrtoolApp {
     fn new() -> Self {
-        Self {
-            selected_file: None,
+        Self::new_with_optional_file(None)
+    }
+
+    fn new_with_optional_file(initial_file: Option<PathBuf>) -> Self {
+        let mut app = Self {
+            selected_file: initial_file,
             extraction_result: None,
             validation_result: None,
             show_raw_json: false,
             schema_path: default_schema_path(),
+        };
+        if app.selected_file.is_some() {
+            app.extract_and_validate();
         }
+        app
     }
 
     fn extract_and_validate(&mut self) {
         if let Some(ref file_path) = self.selected_file {
-            // Extract manifest
-            match extract_jpt_manifest(file_path) {
-                Ok(result) => {
+            // On macOS, files opened via the system (drop-on-icon, Open With) require
+            // security-scoped access before reading.
+            let extract = || extract_jpt_manifest(file_path).map_err(|e| e.to_string());
+            let result = {
+                #[cfg(target_os = "macos")]
+                {
+                    security_scoped::with_security_scoped_access(file_path, extract)
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    extract()
+                }
+            };
+
+            match result {
+                Ok(extract_result) => {
                     // Validate the extracted manifest
-                    let validation = validate_json_value(&result.manifest_value, &self.schema_path)
-                        .unwrap_or_else(|e| ValidationResult {
-                            file_path: file_path.to_string_lossy().to_string(),
-                            is_valid: false,
-                            errors: vec![crtool::ValidationError {
-                                instance_path: "schema".to_string(),
-                                message: e.to_string(),
-                            }],
-                        });
+                    let validation =
+                        validate_json_value(&extract_result.manifest_value, &self.schema_path)
+                            .unwrap_or_else(|e| ValidationResult {
+                                file_path: file_path.to_string_lossy().to_string(),
+                                is_valid: false,
+                                errors: vec![crtool::ValidationError {
+                                    instance_path: "schema".to_string(),
+                                    message: e.to_string(),
+                                }],
+                            });
 
                     self.validation_result = Some(validation);
-                    self.extraction_result = Some(Ok(result));
+                    self.extraction_result = Some(Ok(extract_result));
                 }
                 Err(e) => {
-                    self.extraction_result = Some(Err(e.to_string()));
+                    self.extraction_result = Some(Err(e));
                     self.validation_result = None;
                 }
             }
@@ -97,6 +152,26 @@ impl Default for CrtoolApp {
 
 impl eframe::App for CrtoolApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle files from macOS drop-on-icon / Open With (Apple Event queue)
+        #[cfg(target_os = "macos")]
+        for path in macos_open_document::drain_pending_files() {
+            if crtool::is_supported_asset_path(&path) && path.is_file() {
+                self.selected_file = Some(path);
+                self.extract_and_validate();
+                break;
+            }
+        }
+
+        // Handle files dropped onto the window
+        let dropped: Vec<egui::DroppedFile> = ctx.input(|i| i.raw.dropped_files.clone());
+        for file in dropped {
+            if let Some(path) = file.path.filter(|p| crtool::is_supported_asset_path(p)) {
+                self.selected_file = Some(path);
+                self.extract_and_validate();
+                break; // use first supported file
+            }
+        }
+
         // Add menu bar with File and Edit menus
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
@@ -125,29 +200,27 @@ impl eframe::App for CrtoolApp {
 
                     ui.add_enabled_ui(self.extraction_result.is_some(), |ui| {
                         if ui.button("💾 Save As...").clicked() {
-                            if let Some(ref result) = self.extraction_result {
-                                if let Ok(ref manifest) = result {
-                                    // Generate default filename
-                                    let default_name = if let Some(ref path) = self.selected_file {
-                                        let stem = path
-                                            .file_stem()
-                                            .and_then(|s| s.to_str())
-                                            .unwrap_or("manifest");
-                                        format!("{}-indicators.json", stem)
-                                    } else {
-                                        "manifest-indicators.json".to_string()
-                                    };
+                            if let Some(Ok(ref manifest)) = self.extraction_result {
+                                // Generate default filename
+                                let default_name = if let Some(ref path) = self.selected_file {
+                                    let stem = path
+                                        .file_stem()
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("manifest");
+                                    format!("{}-indicators.json", stem)
+                                } else {
+                                    "manifest-indicators.json".to_string()
+                                };
 
-                                    if let Some(save_path) = rfd::FileDialog::new()
-                                        .set_file_name(&default_name)
-                                        .add_filter("JSON", &["json"])
-                                        .save_file()
+                                if let Some(save_path) = rfd::FileDialog::new()
+                                    .set_file_name(&default_name)
+                                    .add_filter("JSON", &["json"])
+                                    .save_file()
+                                {
+                                    if let Err(e) =
+                                        std::fs::write(&save_path, &manifest.manifest_json)
                                     {
-                                        if let Err(e) =
-                                            std::fs::write(&save_path, &manifest.manifest_json)
-                                        {
-                                            eprintln!("Failed to save file: {}", e);
-                                        }
+                                        eprintln!("Failed to save file: {}", e);
                                     }
                                 }
                             }

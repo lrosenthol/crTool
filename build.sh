@@ -12,6 +12,7 @@ echo ""
 BUILD_CLI=true
 BUILD_GUI=false
 RELEASE_MODE=""
+MAC_APP=false
 
 for arg in "$@"; do
     case $arg in
@@ -34,6 +35,13 @@ for arg in "$@"; do
             RELEASE_MODE="--release"
             shift
             ;;
+        --mac-app)
+            BUILD_CLI=false
+            BUILD_GUI=true
+            RELEASE_MODE="--release"
+            MAC_APP=true
+            shift
+            ;;
         --help)
             echo "Usage: ./build.sh [options]"
             echo ""
@@ -42,6 +50,7 @@ for arg in "$@"; do
             echo "  --gui-only    Build only the GUI tool"
             echo "  --all         Build both CLI and GUI"
             echo "  --release     Build in release mode"
+            echo "  --mac-app     Build GUI in release and create macOS crTool.app bundle (macOS only)"
             echo "  --help        Show this help message"
             echo ""
             exit 0
@@ -86,6 +95,43 @@ if [ "$BUILD_GUI" = true ]; then
     echo ""
 fi
 
+# Create macOS .app bundle (macOS only)
+if [ "$MAC_APP" = true ]; then
+    if [ "$(uname)" != "Darwin" ]; then
+        echo "Error: --mac-app is only supported on macOS."
+        exit 1
+    fi
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    APP_NAME="crTool.app"
+    APP_DIR="$SCRIPT_DIR/$APP_NAME"
+    CONTENTS="$APP_DIR/Contents"
+    MACOS_DIR="$CONTENTS/MacOS"
+    RESOURCES_DIR="$CONTENTS/Resources"
+    RELEASE_BIN="$SCRIPT_DIR/target/release/crTool-gui"
+    INFO_PLIST_SRC="$SCRIPT_DIR/crtool-gui/macos/Info.plist"
+    ICON_SRC="$SCRIPT_DIR/crtool-gui/macos/AppIcon.icns"
+
+    echo "→ Creating macOS app bundle: $APP_NAME"
+    rm -rf "$APP_DIR"
+    mkdir -p "$MACOS_DIR"
+    mkdir -p "$RESOURCES_DIR"
+
+    cp "$RELEASE_BIN" "$MACOS_DIR/crTool"
+    chmod +x "$MACOS_DIR/crTool"
+    cp "$INFO_PLIST_SRC" "$CONTENTS/Info.plist"
+    if [ -f "$ICON_SRC" ]; then
+        cp "$ICON_SRC" "$RESOURCES_DIR/AppIcon.icns"
+    fi
+
+    ENTITLEMENTS_SRC="$SCRIPT_DIR/crtool-gui/macos/crTool.entitlements"
+    if [ -f "$ENTITLEMENTS_SRC" ]; then
+        cp "$ENTITLEMENTS_SRC" "$CONTENTS/entitlements.plist"
+    fi
+
+    echo "✓ $APP_NAME created at $APP_DIR"
+    echo ""
+fi
+
 # Show output locations
 echo "================================"
 echo "Build Complete!"
@@ -105,9 +151,15 @@ fi
 if [ "$BUILD_GUI" = true ]; then
     echo "GUI binary: $BUILD_DIR/crTool-gui"
 fi
+if [ "$MAC_APP" = true ]; then
+    echo "macOS app:   crTool.app"
+fi
 
 echo ""
 echo "To run the CLI: ./$BUILD_DIR/crTool --help"
 if [ "$BUILD_GUI" = true ]; then
     echo "To run the GUI: ./$BUILD_DIR/crTool-gui"
+fi
+if [ "$MAC_APP" = true ]; then
+    echo "To run the app: open crTool.app"
 fi
