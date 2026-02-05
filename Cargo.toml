@@ -1,13 +1,32 @@
-[package]
-name = "crTool"
+[workspace]
+members = [".", "crtool-gui"]
+resolver = "2"
+
+[workspace.package]
 version = "0.2.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
-description = "Content Credential Tool - A CLI tool to work with Content Credentials (C2PA Manifests)"
 license = "MIT"
 repository = "https://github.com/lrosenthol/crTool"
+
+[package]
+name = "crtool"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Content Credential Tool - A library and CLI tool to work with Content Credentials (C2PA Manifests)"
+license.workspace = true
+repository.workspace = true
 keywords = ["c2pa", "content-authenticity", "provenance", "media", "cli"]
 categories = ["command-line-utilities", "multimedia"]
+
+[lib]
+name = "crtool"
+path = "src/lib.rs"
+
+[[bin]]
+name = "crtool"
+path = "src/main.rs"
 
 [dependencies]
 c2pa = { path = "../c2pa-rs/sdk", features = ["file_io"] }

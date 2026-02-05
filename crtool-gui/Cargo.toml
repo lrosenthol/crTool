@@ -1,0 +1,16 @@
+[package]
+name = "crtool-gui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leonard Rosenthol"]
+description = "GUI for Content Credential Tool - Extract and validate C2PA manifests"
+license = "MIT"
+
+[dependencies]
+crtool = { path = ".." }
+eframe = "0.30"
+egui = "0.30"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+rfd = "0.15"  # Native file dialogs
