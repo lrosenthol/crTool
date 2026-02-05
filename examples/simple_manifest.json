@@ -1,25 +1,25 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "crTool/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Created Image",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.created",
-            "when": "2024-01-07T12:00:00Z",
-            "softwareAgent": "crTool 0.1.0"
-          }
-        ]
-      },
-      "created": true
-    }
-  ],
-  "ingredients": []
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Created Image",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "crTool 0.1.0"
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
 }

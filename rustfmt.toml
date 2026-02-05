@@ -20,4 +20,3 @@ force_explicit_abi = true
 # Note: Some advanced options like imports_granularity and group_imports
 # require nightly Rust. If you want to use those, run:
 # cargo +nightly fmt
-

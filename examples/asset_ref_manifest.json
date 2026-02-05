@@ -1,44 +1,44 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "crTool/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Image with Asset Reference",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.created",
-            "when": "2024-01-07T12:00:00Z",
-            "softwareAgent": "crTool 0.1.0"
-          }
-        ]
-      },
-      "created": true
-    },
-    {
-      "label": "c2pa.asset-ref",
-      "data": {
-        "references": [
-          {
-            "reference": {
-              "uri": "https://example.com/original-asset.jpg"
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Asset Reference",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "crTool 0.1.0"
+                    }
+                ]
             },
-            "description": "Original high-resolution source image"
-          },
-          {
-            "reference": {
-              "uri": "ipfs://QmXyZ123456789abcdef"
-            },
-            "description": "Decentralized backup copy on IPFS"
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients": []
+            "created": true
+        },
+        {
+            "label": "c2pa.asset-ref",
+            "data": {
+                "references": [
+                    {
+                        "reference": {
+                            "uri": "https://example.com/original-asset.jpg"
+                        },
+                        "description": "Original high-resolution source image"
+                    },
+                    {
+                        "reference": {
+                            "uri": "ipfs://QmXyZ123456789abcdef"
+                        },
+                        "description": "Decentralized backup copy on IPFS"
+                    }
+                ]
+            }
+        }
+    ],
+    "ingredients": []
 }

@@ -1,38 +1,38 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "crTool/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Image with Cloud-Hosted Assertion Data",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.created",
-            "when": "2024-01-07T12:00:00Z",
-            "softwareAgent": "crTool 0.1.0"
-          }
-        ]
-      },
-      "created": true
-    },
-    {
-      "label": "c2pa.cloud-data",
-      "data": {
-        "label": "c2pa.actions",
-        "size": 2048,
-        "location": {
-          "url": "https://cloud.example.com/assertions/abc123def456",
-          "alg": "sha256",
-          "hash": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Cloud-Hosted Assertion Data",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "crTool 0.1.0"
+                    }
+                ]
+            },
+            "created": true
         },
-        "content_type": "application/json"
-      }
-    }
-  ],
-  "ingredients": []
+        {
+            "label": "c2pa.cloud-data",
+            "data": {
+                "label": "c2pa.actions",
+                "size": 2048,
+                "location": {
+                    "url": "https://cloud.example.com/assertions/abc123def456",
+                    "alg": "sha256",
+                    "hash": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+                },
+                "content_type": "application/json"
+            }
+        }
+    ],
+    "ingredients": []
 }

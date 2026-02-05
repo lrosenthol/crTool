@@ -1,52 +1,52 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "crTool/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Composite Image from Multiple Sources",
-  "format": "image/jpeg",
-  "instance_id": "xmp:iid:abcdef12-3456-7890-abcd-ef1234567890",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.opened",
-            "when": "2024-01-07T11:00:00Z",
-            "softwareAgent": "Photoshop 2024"
-          },
-          {
-            "action": "c2pa.composited",
-            "when": "2024-01-07T11:30:00Z",
-            "softwareAgent": "Photoshop 2024",
-            "parameters": {
-              "description": "Combined background and foreground layers"
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Composite Image from Multiple Sources",
+    "format": "image/jpeg",
+    "instance_id": "xmp:iid:abcdef12-3456-7890-abcd-ef1234567890",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2024-01-07T11:00:00Z",
+                        "softwareAgent": "Photoshop 2024"
+                    },
+                    {
+                        "action": "c2pa.composited",
+                        "when": "2024-01-07T11:30:00Z",
+                        "softwareAgent": "Photoshop 2024",
+                        "parameters": {
+                            "description": "Combined background and foreground layers"
+                        }
+                    },
+                    {
+                        "action": "c2pa.color_adjustments",
+                        "when": "2024-01-07T11:45:00Z",
+                        "softwareAgent": "Photoshop 2024"
+                    }
+                ]
             }
-          },
-          {
-            "action": "c2pa.color_adjustments",
-            "when": "2024-01-07T11:45:00Z",
-            "softwareAgent": "Photoshop 2024"
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients": [
-    {
-      "title": "Background Image",
-      "format": "image/jpeg",
-      "relationship": "parentOf",
-      "instance_id": "xmp:iid:11111111-2222-3333-4444-555555555555"
-    },
-    {
-      "title": "Foreground Element",
-      "format": "image/png",
-      "relationship": "componentOf",
-      "instance_id": "xmp:iid:66666666-7777-8888-9999-000000000000"
-    }
-  ]
+        }
+    ],
+    "ingredients": [
+        {
+            "title": "Background Image",
+            "format": "image/jpeg",
+            "relationship": "parentOf",
+            "instance_id": "xmp:iid:11111111-2222-3333-4444-555555555555"
+        },
+        {
+            "title": "Foreground Element",
+            "format": "image/png",
+            "relationship": "componentOf",
+            "instance_id": "xmp:iid:66666666-7777-8888-9999-000000000000"
+        }
+    ]
 }

@@ -1,41 +1,41 @@
 {
-  "claim_generator_info": [
-    {
-      "name": "crTool/0.1.0",
-      "version": "0.1.0"
-    }
-  ],
-  "title": "Edited Photo",
-  "instance_id": "xmp:iid:12345678-1234-1234-1234-123456789abc",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.opened",
-            "when": "2024-01-07T10:00:00Z",
-            "softwareAgent": "PhotoEditor Pro 2.0"
-          },
-          {
-            "action": "c2pa.edited",
-            "when": "2024-01-07T10:15:00Z",
-            "softwareAgent": "PhotoEditor Pro 2.0",
-            "parameters": {
-              "description": "Applied color correction and cropping"
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Edited Photo",
+    "instance_id": "xmp:iid:12345678-1234-1234-1234-123456789abc",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2024-01-07T10:00:00Z",
+                        "softwareAgent": "PhotoEditor Pro 2.0"
+                    },
+                    {
+                        "action": "c2pa.edited",
+                        "when": "2024-01-07T10:15:00Z",
+                        "softwareAgent": "PhotoEditor Pro 2.0",
+                        "parameters": {
+                            "description": "Applied color correction and cropping"
+                        }
+                    },
+                    {
+                        "action": "c2pa.filtered",
+                        "when": "2024-01-07T10:20:00Z",
+                        "softwareAgent": "PhotoEditor Pro 2.0",
+                        "parameters": {
+                            "name": "Vintage Film"
+                        }
+                    }
+                ]
             }
-          },
-          {
-            "action": "c2pa.filtered",
-            "when": "2024-01-07T10:20:00Z",
-            "softwareAgent": "PhotoEditor Pro 2.0",
-            "parameters": {
-              "name": "Vintage Film"
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients": []
+        }
+    ],
+    "ingredients": []
 }

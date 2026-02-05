@@ -82,6 +82,7 @@ cat target/test_output/testset/p-actions-placed-manifest-metadata_manifest_jpt.j
 ```
 
 **Output:**
+
 ```json
 {
   "dateTime": "2026-01-23T20:52:22.733Z",
@@ -97,6 +98,7 @@ cat target/test_output/testset/p-actions-placed-manifest-metadata_manifest_jpt.j
 The `metadata` field in `ingredients_from_files` now supports:
 
 ### Standard C2PA AssertionMetadata Fields
+
 - `dateTime`: ISO 8601 timestamp (automatically added)
 - `reviewRatings`: Array of review ratings
 - `dataSource`: Structured data source information
@@ -105,7 +107,9 @@ The `metadata` field in `ingredients_from_files` now supports:
 - `reference`: Hashed URI reference to another assertion
 
 ### Custom/Arbitrary Fields
+
 Any key/value pairs not matching standard fields are preserved as additional metadata, for example:
+
 - `com.adobe.repo.asset-id`
 - `com.adobe.repo.version`
 - Any other custom namespaced fields

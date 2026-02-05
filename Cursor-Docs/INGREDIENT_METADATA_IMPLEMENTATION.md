@@ -24,6 +24,7 @@ pub struct AssertionMetadata {
 ```
 
 **New methods:**
+
 - `set_field<S: Into<String>>(self, key: S, value: Value) -> Self` - Set a single arbitrary field
 - `get_field(&self, key: &str) -> Option<&Value>` - Get a field value
 - `additional_fields(&self) -> &HashMap<String, Value>` - Get all additional fields
@@ -67,11 +68,13 @@ Added identical metadata processing logic to the `process_ingredients_with_thumb
 ### 3. Documentation Updates
 
 #### INGREDIENT_METADATA_ISSUE.md
+
 - Updated to document the resolution
 - Changed from "Issue Analysis" to "RESOLVED"
 - Added verification steps and examples
 
 #### README.md
+
 - Updated "Ingredient Configuration" section
 - Added "Ingredient Metadata Support" subsection
 - Documented both standard and custom metadata fields
@@ -106,6 +109,7 @@ Added identical metadata processing logic to the `process_ingredients_with_thumb
 ### Supported Metadata Types
 
 **Standard C2PA fields** (optional):
+
 - `dateTime`: ISO 8601 timestamp (auto-generated if not provided)
 - `reviewRatings`: Array of review rating objects
 - `dataSource`: Data source information
@@ -113,6 +117,7 @@ Added identical metadata processing logic to the `process_ingredients_with_thumb
 - `localizations`: Localized translations
 
 **Custom fields:**
+
 - Any key/value pairs using JSON types: string, number, boolean, object, array, null
 - Best practice: use namespaced keys (e.g., `com.company.field-name`)
 
@@ -127,6 +132,7 @@ cargo test --test integration_tests test_testset_manifests
 Test case: `p-actions-placed-manifest-metadata.json`
 
 **Output verification:**
+
 ```bash
 cat target/test_output/testset/p-actions-placed-manifest-metadata_manifest_jpt.json | \
   jq '.manifests[] | select(.assertions."c2pa.ingredient.v3".instance_id == "test_ingredient") | \
@@ -134,6 +140,7 @@ cat target/test_output/testset/p-actions-placed-manifest-metadata_manifest_jpt.j
 ```
 
 **Result:**
+
 ```json
 {
   "dateTime": "2026-01-23T20:52:22.733Z",
@@ -156,6 +163,7 @@ cat target/test_output/testset/p-actions-placed-manifest-metadata_manifest_jpt.j
 ### C2PA Compliance
 
 This implementation:
+
 - ✅ Follows C2PA specification for assertion metadata extensibility
 - ✅ Preserves all standard AssertionMetadata fields
 - ✅ Allows spec-compliant arbitrary metadata
