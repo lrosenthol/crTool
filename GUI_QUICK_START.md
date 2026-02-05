@@ -66,6 +66,8 @@ crTool/
 
 ### GUI Application
 - Native file picker (macOS/Windows/Linux)
+- **Drag and drop**: Drop a supported file onto the window to open it
+- **macOS**: Drop a file onto the **Dock** icon when the app is running, or use **Open With → crTool** in Finder. Dragging onto the app icon in Finder (to launch with a file) may show a system error; launch the app first, then use Dock drop or Open With.
 - Automatic manifest extraction
 - Real-time validation
 - Collapsible tree view
@@ -135,13 +137,18 @@ cargo build --release --workspace
 ```
 
 ### macOS Distribution
-Consider creating an `.app` bundle:
+To build a `.app` bundle (macOS only), use the build script:
 ```bash
-# Basic app structure
-mkdir -p crTool.app/Contents/MacOS
-cp target/release/crTool-gui crTool.app/Contents/MacOS/
-# Add Info.plist, icon, etc.
+./build.sh --mac-app
 ```
+This builds the GUI in release mode and creates `crTool.app` with:
+- **Contents/MacOS/crTool** — the GUI binary
+- **Contents/Info.plist** — bundle metadata (from `crtool-gui/macos/Info.plist`)
+- **Contents/Resources/** — optional: add `AppIcon.icns` here (or place it at `crtool-gui/macos/AppIcon.icns` before building and it will be copied in)
+- **Contents/entitlements.plist** — copied from `crtool-gui/macos/crTool.entitlements` (needed for security-scoped file access when opening files via drop-on-icon or "Open With")
+
+Run the app with `open crTool.app` or by double-clicking it in Finder. For **signed** distribution (e.g. notarization), sign the app with the entitlements:  
+`codesign --force --deep --sign "Developer ID Application: Your Name" --options runtime --entitlements crtool-gui/macos/crTool.entitlements crTool.app`
 
 ### Windows Distribution
 Add app icon and version info to `crtool-gui/Cargo.toml`:
