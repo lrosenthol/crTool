@@ -1,6 +1,11 @@
 # Content Credential Tool
 
-A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/contentauth/c2pa-rs) library to create and embed C2PA (Coalition for Content Provenance and Authenticity) manifests into media assets based on JSON configuration files.
+A Rust-based tool (CLI and GUI) that uses the [c2pa-rs](https://github.com/contentauth/c2pa-rs) library to create and embed C2PA (Coalition for Content Provenance and Authenticity) manifests into media assets based on JSON configuration files.
+
+## Tools
+
+- **CLI (`crTool`)**: Command-line tool for creating, embedding, extracting, and validating C2PA manifests (see `crtool-cli/README.md`)
+- **GUI (`crTool-gui`)**: Graphical interface for extracting and validating C2PA manifests (see `crtool-gui/README.md`)
 
 ## Features
 
@@ -39,7 +44,22 @@ cd crTool
 cargo build --release
 ```
 
-The compiled binary will be available at `target/release/crTool`.
+The compiled CLI binary will be available at `target/release/crTool`.
+
+### Building the GUI
+
+To build the graphical user interface:
+
+```bash
+# Build the CLI and/or GUI
+cargo build --release -p crTool      # CLI only
+cargo build --release -p crTool-gui  # GUI only
+
+# Run the GUI
+cargo run --release -p crTool-gui
+```
+
+See [`crtool-gui/README.md`](crtool-gui/README.md) for more details about the GUI.
 
 **Directory Structure Required:**
 ```

@@ -205,6 +205,24 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug crTool-gui",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--release",
+                    "--package=crTool-gui"
+                ],
+                "filter": {
+                    "name": "crTool-gui",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

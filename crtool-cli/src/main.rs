@@ -16,6 +16,7 @@ use c2pa::{
     SigningAlg,
 };
 use clap::Parser;
+use crtool::SUPPORTED_ASSET_EXTENSIONS;
 use glob::glob;
 use serde_json::Value as JsonValue;
 use std::fs;
@@ -30,7 +31,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     manifest: Option<PathBuf>,
 
-    /// Path(s) to input media asset(s) (JPEG, PNG, etc.). Supports glob patterns (e.g., "*.jpg", "images/*.png")
+    /// Path(s) to input media asset(s). Supported: avi, avif, c2pa, dng, gif, heic, heif, jpg/jpeg, m4a, mov, mp3, mp4, pdf, png, svg, tiff, wav, webp. Supports glob patterns (e.g., "*.jpg", "images/*.png")
     #[arg(value_name = "INPUT_FILE", required = true, num_args = 1..)]
     input: Vec<String>,
 
@@ -145,17 +146,19 @@ fn extension_to_mime(extension: &str) -> Option<&'static str> {
         "ico" => "image/x-icon",
         "bmp" => "image/bmp",
         "webp" => "image/webp",
-        "dng" => "image/dng",
+        "dng" => "image/x-adobe-dng",
         "heic" => "image/heic",
         "heif" => "image/heif",
         "avif" => "image/avif",
+        "avi" => "video/avi",
+        "c2pa" => "application/c2pa",
         "mp2" | "mpa" | "mpe" | "mpeg" | "mpg" | "mpv2" => "video/mpeg",
         "mp4" => "video/mp4",
         "mov" | "qt" => "video/quicktime",
         "m4a" => "audio/mp4",
         "mid" | "rmi" => "audio/mid",
         "mp3" => "audio/mpeg",
-        "wav" => "audio/vnd.wav",
+        "wav" => "audio/wav",
         "aif" | "aifc" | "aiff" => "audio/aiff",
         "ogg" => "audio/ogg",
         "pdf" => "application/pdf",
@@ -685,11 +688,8 @@ fn process_single_file(
 fn validate_json_files(input_paths: &[PathBuf]) -> Result<()> {
     println!("=== Validating JSON files against indicators schema ===\n");
 
-    // Load the schema from the embedded file
-    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("INTERNAL")
-        .join("schemas")
-        .join("indicators-schema.json");
+    // Load the schema from the crtool library's bundled path
+    let schema_path = crtool::default_schema_path();
 
     if !schema_path.exists() {
         anyhow::bail!("Schema file not found at: {:?}", schema_path);
@@ -800,10 +800,25 @@ fn main() -> Result<()> {
         anyhow::bail!("No input files specified");
     }
 
-    // Validate input files exist
+    // Validate input files exist and have supported extensions (except in validate mode)
     for input_file in &input_files {
         if !input_file.exists() {
             anyhow::bail!("Input file does not exist: {:?}", input_file);
+        }
+    }
+
+    if !cli.validate {
+        let unsupported: Vec<_> = input_files
+            .iter()
+            .filter(|p| !crtool::is_supported_asset_path(p))
+            .collect();
+        if !unsupported.is_empty() {
+            anyhow::bail!(
+                "Unsupported file format(s). The following file(s) have extensions not supported by C2PA: {:?}. \
+                Supported extensions: {}.",
+                unsupported.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
+                SUPPORTED_ASSET_EXTENSIONS.join(", ")
+            );
         }
     }
 
@@ -965,9 +980,9 @@ mod tests {
 
     #[test]
     fn test_detect_signing_algorithm_ed25519() {
-        // Test with the ed25519 test certificate
+        // Test with the ed25519 test certificate (workspace root tests/fixtures)
         let cert_path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/certs/ed25519.pub");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/certs/ed25519.pub");
 
         if cert_path.exists() {
             let result = detect_signing_algorithm(&cert_path);
@@ -998,9 +1013,9 @@ mod tests {
 
     #[test]
     fn test_validate_json_files_with_valid_manifest() {
-        // Test with a valid example manifest
+        // Test with a valid example manifest (workspace root examples/)
         let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("examples")
+            .join("../examples")
             .join("simple_manifest.json");
 
         if manifest_path.exists() {

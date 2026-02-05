@@ -1,27 +1,40 @@
-[package]
-name = "crTool"
+[workspace]
+members = [".", "crtool-gui", "crtool-cli"]
+resolver = "2"
+
+[workspace.package]
 version = "0.2.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
-description = "Content Credential Tool - A CLI tool to work with Content Credentials (C2PA Manifests)"
 license = "MIT"
 repository = "https://github.com/lrosenthol/crTool"
-keywords = ["c2pa", "content-authenticity", "provenance", "media", "cli"]
-categories = ["command-line-utilities", "multimedia"]
+
+[package]
+name = "crtool"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Content Credential Tool - A library to work with Content Credentials (C2PA Manifests)"
+license.workspace = true
+repository.workspace = true
+keywords = ["c2pa", "content-authenticity", "provenance", "media"]
+categories = ["multimedia"]
+
+[lib]
+name = "crtool"
+path = "src/lib.rs"
 
 [dependencies]
 c2pa = { path = "../c2pa-rs/sdk", features = ["file_io"] }
-clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
 thiserror = "1.0"
+jsonschema = "0.23"
+
+[dev-dependencies]
 ed25519-dalek = "2.2"
 pem = "3.0"
-p256 = { version = "0.13", features = ["ecdsa"] }
-rsa = { version = "0.9", features = ["sha2"] }
-x509-parser = "0.16"
-der-parser = "9.0"
 image = { version = "0.25", default-features = false, features = [
 	"jpeg",
 	"png",
@@ -30,12 +43,6 @@ image = { version = "0.25", default-features = false, features = [
 	"tiff",
 	"webp",
 ] }
-glob = "0.3"
-jsonschema = "0.23"
-
-[dev-dependencies]
-ed25519-dalek = "2.2"
-pem = "3.0"
 
 [profile.release]
 opt-level = 3
