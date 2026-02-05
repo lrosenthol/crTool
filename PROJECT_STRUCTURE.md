@@ -55,8 +55,8 @@ Three comprehensive JSON manifest examples:
 ## Build Artifacts
 
 The project builds to:
-- `target/release/crTool` - Optimized binary
-- `target/debug/crTool` - Debug binary
+- `target/release/crTool` - CLI binary (optimized)
+- `target/debug/crTool` - CLI binary (debug)
 
 ## Dependencies
 

@@ -73,7 +73,7 @@ echo ""
 # Build CLI
 if [ "$BUILD_CLI" = true ]; then
     echo "→ Building CLI tool..."
-    cargo build $RELEASE_MODE
+    cargo build $RELEASE_MODE -p crTool
     echo "✓ CLI build complete"
     echo ""
 fi
@@ -81,7 +81,7 @@ fi
 # Build GUI
 if [ "$BUILD_GUI" = true ]; then
     echo "→ Building GUI tool..."
-    cargo build $RELEASE_MODE -p crtool-gui
+    cargo build $RELEASE_MODE -p crTool-gui
     echo "✓ GUI build complete"
     echo ""
 fi
@@ -99,15 +99,15 @@ else
 fi
 
 if [ "$BUILD_CLI" = true ]; then
-    echo "CLI binary: $BUILD_DIR/crtool"
+    echo "CLI binary: $BUILD_DIR/crTool"
 fi
 
 if [ "$BUILD_GUI" = true ]; then
-    echo "GUI binary: $BUILD_DIR/crtool-gui"
+    echo "GUI binary: $BUILD_DIR/crTool-gui"
 fi
 
 echo ""
-echo "To run the CLI: ./$BUILD_DIR/crtool --help"
+echo "To run the CLI: ./$BUILD_DIR/crTool --help"
 if [ "$BUILD_GUI" = true ]; then
-    echo "To run the GUI: ./$BUILD_DIR/crtool-gui"
+    echo "To run the GUI: ./$BUILD_DIR/crTool-gui"
 fi

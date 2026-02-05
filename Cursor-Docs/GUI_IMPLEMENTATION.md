@@ -106,8 +106,8 @@ cargo run --release -- --help
 
 ### GUI Only
 ```bash
-cargo build --release -p crtool-gui
-cargo run --release -p crtool-gui
+cargo build --release -p crTool-gui
+cargo run --release -p crTool-gui
 ```
 
 ### Both (Workspace)
@@ -121,7 +121,7 @@ cargo build --release --workspace
 2. **Test library**: `cargo test --lib`
 3. **Update CLI**: Edit `src/main.rs` if needed
 4. **Update GUI**: Edit `crtool-gui/src/main.rs`
-5. **Test GUI**: `cargo run -p crtool-gui`
+5. **Test GUI**: `cargo run -p crTool-gui`
 
 ## Cross-Platform Support
 
@@ -179,7 +179,7 @@ cargo test --test integration_tests
 
 ### GUI Manual Testing
 ```bash
-cargo run -p crtool-gui
+cargo run -p crTool-gui
 # Then test with files in testset/ directory
 ```
 

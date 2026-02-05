@@ -17,6 +17,25 @@ use c2pa::{
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Path to the crTool CLI binary (when built as part of the workspace).
+pub fn cli_binary_path() -> PathBuf {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_CRTOOL") {
+        return PathBuf::from(path);
+    }
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    let exe = if cfg!(windows) {
+        "crTool.exe"
+    } else {
+        "crTool"
+    };
+    manifest_dir.join("target").join(profile).join(exe)
+}
+
 /// Test helper to get the path to test fixtures
 pub fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")

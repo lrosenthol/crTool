@@ -17,19 +17,9 @@ use std::process::Command;
 
 mod common;
 
-/// Get the path to the compiled test binary
+/// Get the path to the crTool binary
 fn get_binary_path() -> PathBuf {
-    // The binary is built in the target directory
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let profile = if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "release"
-    };
-    manifest_dir
-        .join("target")
-        .join(profile)
-        .join(env!("CARGO_PKG_NAME"))
+    common::cli_binary_path()
 }
 
 /// Get the path to test fixtures directory

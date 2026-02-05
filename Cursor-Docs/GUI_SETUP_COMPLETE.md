@@ -57,17 +57,17 @@ crTool/
 ./build.sh --gui-only --release
 
 # Or use cargo directly
-cargo build --release -p crtool-gui
+cargo build --release -p crTool-gui
 ```
 
 ### Running
 
 ```bash
 # Run the GUI
-cargo run --release -p crtool-gui
+cargo run --release -p crTool-gui
 
 # Or run the built binary
-./target/release/crtool-gui
+./target/release/crTool-gui
 ```
 
 ### Testing
@@ -126,7 +126,7 @@ Built with **egui** for:
        ├─────────────┐
        │             │
 ┌──────▼──────┐ ┌───▼────────┐
-│   crtool    │ │ crtool-gui │
+│   crtool    │ │ crTool-gui │
 │    (CLI)    │ │   (GUI)    │
 └─────────────┘ └────────────┘
 ```
@@ -135,7 +135,7 @@ Built with **egui** for:
 
 ### Immediate Testing
 1. **Build the GUI**: `./build.sh --gui-only --release`
-2. **Run it**: `./target/release/crtool-gui`
+2. **Run it**: `./target/release/crTool-gui`
 3. **Test with your files**: Use files from `testset/`
 
 ### Potential Enhancements
@@ -159,7 +159,7 @@ cargo build --release --workspace
 
 # Binaries will be at:
 # - target/release/crtool (CLI)
-# - target/release/crtool-gui (GUI)
+# - target/release/crTool-gui (GUI)
 ```
 
 For macOS, you might want to create an `.app` bundle. For Windows, consider adding an icon and metadata.
@@ -198,7 +198,7 @@ cargo check --lib
 cargo check --bin crtool
 
 # Check GUI compiles
-cargo check -p crtool-gui
+cargo check -p crTool-gui
 
 # Run tests
 cargo test --lib

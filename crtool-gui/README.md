@@ -19,10 +19,10 @@ From the repository root:
 
 ```bash
 # Build the GUI application
-cargo build --release -p crtool-gui
+cargo build --release -p crTool-gui
 
 # Run the GUI application
-cargo run --release -p crtool-gui
+cargo run --release -p crTool-gui
 ```
 
 ## Usage

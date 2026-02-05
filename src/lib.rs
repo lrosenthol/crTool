@@ -84,9 +84,7 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
     )?;
 
     // Compute asset hash
-    let asset_hash = jpt_reader
-        .compute_asset_hash_from_file(input_path)
-        .ok();
+    let asset_hash = jpt_reader.compute_asset_hash_from_file(input_path).ok();
 
     // Get the active manifest label
     let active_label = jpt_reader
@@ -99,8 +97,8 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
     let manifest_json = jpt_reader.json();
 
     // Parse to serde_json::Value
-    let manifest_value: serde_json::Value = serde_json::from_str(&manifest_json)
-        .context("Failed to parse extracted manifest JSON")?;
+    let manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted manifest JSON")?;
 
     Ok(ManifestExtractionResult {
         input_path: input_path.to_string_lossy().to_string(),

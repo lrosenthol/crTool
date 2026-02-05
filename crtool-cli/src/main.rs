@@ -685,11 +685,8 @@ fn process_single_file(
 fn validate_json_files(input_paths: &[PathBuf]) -> Result<()> {
     println!("=== Validating JSON files against indicators schema ===\n");
 
-    // Load the schema from the embedded file
-    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("INTERNAL")
-        .join("schemas")
-        .join("indicators-schema.json");
+    // Load the schema from the crtool library's bundled path
+    let schema_path = crtool::default_schema_path();
 
     if !schema_path.exists() {
         anyhow::bail!("Schema file not found at: {:?}", schema_path);
@@ -965,9 +962,9 @@ mod tests {
 
     #[test]
     fn test_detect_signing_algorithm_ed25519() {
-        // Test with the ed25519 test certificate
+        // Test with the ed25519 test certificate (workspace root tests/fixtures)
         let cert_path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/certs/ed25519.pub");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/certs/ed25519.pub");
 
         if cert_path.exists() {
             let result = detect_signing_algorithm(&cert_path);
@@ -998,9 +995,9 @@ mod tests {
 
     #[test]
     fn test_validate_json_files_with_valid_manifest() {
-        // Test with a valid example manifest
+        // Test with a valid example manifest (workspace root examples/)
         let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("examples")
+            .join("../examples")
             .join("simple_manifest.json");
 
         if manifest_path.exists() {

@@ -18,17 +18,17 @@ Your crTool project now includes a fully functional GUI application for extracti
 ### Option 2: Using Cargo Directly
 ```bash
 # Build the GUI
-cargo build --release -p crtool-gui
+cargo build --release -p crTool-gui
 
 # Run the GUI
-cargo run --release -p crtool-gui
+cargo run --release -p crTool-gui
 ```
 
 ## Using the GUI
 
 1. **Launch the application**
    ```bash
-   cargo run --release -p crtool-gui
+   cargo run --release -p crTool-gui
    ```
 
 2. **Click "📂 Select Image File"**
@@ -84,7 +84,7 @@ crTool/
 Test with your existing files:
 ```bash
 # Run the GUI
-cargo run --release -p crtool-gui
+cargo run --release -p crTool-gui
 
 # Then select files from:
 # - testset/test_ingredient_manifest.jpg (has manifest)
@@ -101,8 +101,8 @@ Check everything is set up correctly:
 Or manually:
 ```bash
 cargo check --lib              # Check library compiles
-cargo check --bin crtool       # Check CLI compiles
-cargo check -p crtool-gui      # Check GUI compiles
+cargo check -p crTool        # Check CLI compiles
+cargo check -p crTool-gui    # Check GUI compiles
 cargo test --lib               # Run library tests
 ```
 
@@ -130,8 +130,8 @@ For release distribution:
 cargo build --release --workspace
 
 # Binaries are at:
-# - target/release/crtool       (CLI)
-# - target/release/crtool-gui   (GUI)
+# - target/release/crTool     (CLI)
+# - target/release/crTool-gui  (GUI)
 ```
 
 ### macOS Distribution
@@ -139,7 +139,7 @@ Consider creating an `.app` bundle:
 ```bash
 # Basic app structure
 mkdir -p crTool.app/Contents/MacOS
-cp target/release/crtool-gui crTool.app/Contents/MacOS/
+cp target/release/crTool-gui crTool.app/Contents/MacOS/
 # Add Info.plist, icon, etc.
 ```
 
@@ -147,14 +147,14 @@ cp target/release/crtool-gui crTool.app/Contents/MacOS/
 Add app icon and version info to `crtool-gui/Cargo.toml`:
 ```toml
 [package.metadata.winresource]
-OriginalFilename = "crtool-gui.exe"
+OriginalFilename = "crTool-gui.exe"
 FileDescription = "C2PA Content Credential Tool"
 ProductName = "crTool GUI"
 ```
 
 ## Next Steps
 
-1. **Test the GUI**: `cargo run --release -p crtool-gui`
+1. **Test the GUI**: `cargo run --release -p crTool-gui`
 2. **Try with your files**: Use `testset/` files
 3. **Customize if needed**: Edit `crtool-gui/src/main.rs`
 4. **Add features**: See enhancement ideas in `GUI_SETUP_COMPLETE.md`
@@ -176,4 +176,4 @@ You now have:
 - ✅ Documentation and build scripts
 - ✅ All original CLI functionality preserved
 
-**Ready to use!** Run `cargo run --release -p crtool-gui` to start. 🚀
+**Ready to use!** Run `cargo run --release -p crTool-gui` to start. 🚀
