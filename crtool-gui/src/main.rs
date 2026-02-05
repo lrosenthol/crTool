@@ -103,7 +103,7 @@ impl eframe::App for CrtoolApp {
                 ui.menu_button("File", |ui| {
                     if ui.button("📂 Open...").clicked() {
                         if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Images", &["jpg", "jpeg", "png", "webp"])
+                            .add_filter("C2PA-supported files", crtool::SUPPORTED_ASSET_EXTENSIONS)
                             .pick_file()
                         {
                             self.selected_file = Some(path);
@@ -176,11 +176,11 @@ impl eframe::App for CrtoolApp {
             // File selection area
             ui.horizontal(|ui| {
                 if ui
-                    .button(egui::RichText::new("📂 Select Image File").size(16.0))
+                    .button(egui::RichText::new("📂 Select File").size(16.0))
                     .clicked()
                 {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("Images", &["jpg", "jpeg", "png", "webp"])
+                        .add_filter("C2PA-supported files", crtool::SUPPORTED_ASSET_EXTENSIONS)
                         .pick_file()
                     {
                         self.selected_file = Some(path);
@@ -372,8 +372,10 @@ impl eframe::App for CrtoolApp {
                 ui.vertical_centered(|ui| {
                     ui.add_space(100.0);
                     EmojiLabel::new(
-                        egui::RichText::new("👆 Select an image file to extract its C2PA manifest")
-                            .size(18.0),
+                        egui::RichText::new(
+                            "👆 Select a C2PA-supported file (image, video, audio, or PDF) to extract its manifest",
+                        )
+                        .size(18.0),
                     )
                     .show(ui);
                 });

@@ -16,6 +16,22 @@ governing permissions and limitations under the License.
 
 use anyhow::{Context, Result};
 use c2pa::JpegTrustReader;
+
+/// File extensions for asset types supported by c2pa-rs for reading/embedding C2PA manifests.
+/// Matches the formats listed in c2pa-rs [supported-formats](https://github.com/contentauth/c2pa-rs/blob/main/docs/supported-formats.md).
+pub const SUPPORTED_ASSET_EXTENSIONS: &[&str] = &[
+    "avi", "avif", "c2pa", "dng", "gif", "heic", "heif", "jpg", "jpeg", "m4a", "mov", "mp3", "mp4",
+    "pdf", "png", "svg", "tif", "tiff", "wav", "webp",
+];
+
+/// Returns whether a file path has an extension that c2pa-rs supports for C2PA operations.
+pub fn is_supported_asset_path<P: AsRef<Path>>(path: P) -> bool {
+    let ext = match path.as_ref().extension().and_then(|e| e.to_str()) {
+        Some(e) => e.to_lowercase(),
+        None => return false,
+    };
+    SUPPORTED_ASSET_EXTENSIONS.contains(&ext.as_str())
+}
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
