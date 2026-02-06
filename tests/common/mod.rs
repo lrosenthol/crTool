@@ -115,7 +115,10 @@ fn collect_manifest_resource_identifiers(manifest: &serde_json::Value) -> HashSe
     if let Some(assertions) = manifest.get("assertions").and_then(|v| v.as_array()) {
         for assertion in assertions {
             let data = assertion.get("data").and_then(|d| d.as_object());
-            if let Some(templates) = data.and_then(|d| d.get("templates")).and_then(|t| t.as_array()) {
+            if let Some(templates) = data
+                .and_then(|d| d.get("templates"))
+                .and_then(|t| t.as_array())
+            {
                 for template in templates {
                     if let Some(icon) = template.get("icon").and_then(|i| i.get("identifier")) {
                         if let Some(s) = icon.as_str() {
