@@ -77,7 +77,7 @@ struct CrtoolApp {
     extraction_result: Option<Result<ManifestExtractionResult, String>>,
     /// Validation result
     validation_result: Option<ValidationResult>,
-    /// Whether to show the raw JSON
+    /// Whether to show the raw JSON (replaces tree + manifest data when on)
     show_raw_json: bool,
     /// Schema path (defaults to bundled schema)
     schema_path: PathBuf,
@@ -304,8 +304,10 @@ impl eframe::App for CrtoolApp {
                             });
                         }
 
-                        // Trust status
-                        if let Some(trust_status) = get_trust_status(&manifest.manifest_value) {
+                        // Trust status (from active manifest, not index 0)
+                        if let Some(trust_status) =
+                            get_trust_status(&manifest.manifest_value, &manifest.active_label)
+                        {
                             ui.horizontal(|ui| {
                                 let (icon, color, text) = match trust_status.as_str() {
                                     "signingCredential.trusted" => {
@@ -392,11 +394,14 @@ impl eframe::App for CrtoolApp {
 
                         ui.separator();
 
-                        // Toggle for raw JSON view
+                        // Toggle: Raw JSON replaces both Tree and Manifest Data views when on
                         ui.horizontal(|ui| {
                             ui.checkbox(&mut self.show_raw_json, "");
-                            EmojiLabel::new(egui::RichText::new("📄 Show Raw JSON").size(15.0))
-                                .show(ui);
+                            EmojiLabel::new(
+                                egui::RichText::new("📄 Show Raw JSON (replaces tree and manifest data)")
+                                    .size(15.0),
+                            )
+                            .show(ui);
                         });
 
                         if self.show_raw_json {
@@ -407,7 +412,6 @@ impl eframe::App for CrtoolApp {
                             egui::ScrollArea::vertical()
                                 .id_salt("raw_json")
                                 .show(ui, |ui| {
-                                    // Syntax-highlighted JSON via egui_extras
                                     let theme =
                                         egui_extras::syntax_highlighting::CodeTheme::from_style(
                                             ui.style(),
@@ -420,16 +424,44 @@ impl eframe::App for CrtoolApp {
                                     );
                                 });
                         } else {
-                            // Display structured manifest data
+                            // Side by side: Manifest Data (left), Tree (right); fill full height
                             ui.separator();
-                            EmojiLabel::new(egui::RichText::new("📊 Manifest Data:").size(17.0))
-                                .show(ui);
-
-                            egui::ScrollArea::vertical()
-                                .id_salt("manifest_data")
-                                .show(ui, |ui| {
-                                    display_json_tree(ui, &manifest.manifest_value, 0);
+                            let fill_height = ui.available_height();
+                            ui.horizontal(|ui| {
+                                // Left: Manifest Data
+                                ui.vertical(|ui| {
+                                    ui.set_min_height(fill_height);
+                                    ui.set_min_width(ui.available_width() / 2.0);
+                                    EmojiLabel::new(
+                                        egui::RichText::new("📊 Manifest Data").size(16.0),
+                                    )
+                                    .show(ui);
+                                    egui::ScrollArea::vertical()
+                                        .id_salt("manifest_data")
+                                        .show(ui, |ui| {
+                                            display_json_tree(ui, &manifest.manifest_value, 0);
+                                        });
                                 });
+                                // Right: Tree view
+                                ui.vertical(|ui| {
+                                    ui.set_min_height(fill_height);
+                                    ui.set_min_width(ui.available_width());
+                                    EmojiLabel::new(
+                                        egui::RichText::new("🌳 Manifest & Ingredients Tree")
+                                            .size(16.0),
+                                    )
+                                    .show(ui);
+                                    egui::ScrollArea::vertical()
+                                        .id_salt("tree_view")
+                                        .show(ui, |ui| {
+                                            display_manifest_ingredient_tree(
+                                                ui,
+                                                &manifest.manifest_value,
+                                                &manifest.active_label,
+                                            );
+                                        });
+                                });
+                            });
                         }
                     }
                     Err(e) => {
@@ -464,13 +496,451 @@ fn get_selected_text(_ctx: &egui::Context) -> String {
     String::new()
 }
 
-/// Extract trust status from the manifest
-fn get_trust_status(manifest_value: &serde_json::Value) -> Option<String> {
-    // Try to find trust status in the first manifest's status.trust field
-    manifest_value
-        .get("manifests")?
-        .as_array()?
-        .first()?
+/// Collect ingredients from a manifest object (claim or full manifest).
+/// Handles: claim.ingredients, claim.v2.ingredients, assertions with c2pa.ingredient*.
+fn collect_ingredients_from_manifest(manifest_obj: &serde_json::Value) -> Vec<&serde_json::Value> {
+    let mut out = Vec::new();
+    let obj = match manifest_obj.as_object() {
+        Some(o) => o,
+        None => return out,
+    };
+
+    // Claim-level ingredients (claim.v2 or claim)
+    for key in ["claim.v2", "claim"] {
+        if let Some(claim) = obj.get(key) {
+            if let Some(arr) = claim.get("ingredients").and_then(|v| v.as_array()) {
+                for ing in arr {
+                    out.push(ing);
+                }
+            }
+        }
+    }
+
+    // Top-level ingredients (flat manifest format)
+    if let Some(arr) = obj.get("ingredients").and_then(|v| v.as_array()) {
+        for ing in arr {
+            out.push(ing);
+        }
+    }
+
+    // Assertions: c2pa.ingredient, c2pa.ingredient.v3, etc.
+    if let Some(assertions) = obj.get("assertions").and_then(|v| v.as_object()) {
+        for (key, val) in assertions {
+            if key.contains("ingredient") {
+                if let Some(data) = val.get("data") {
+                    if let Some(arr) = data.as_array() {
+                        for ing in arr {
+                            out.push(ing);
+                        }
+                    } else if data.get("relationship").is_some()
+                        || data.get("title").is_some()
+                        || data.get("instanceID").is_some()
+                    {
+                        out.push(data);
+                    }
+                } else if val.get("relationship").is_some()
+                    || val.get("title").is_some()
+                    || val.get("instanceID").is_some()
+                {
+                    out.push(val);
+                }
+            }
+        }
+    }
+
+    out
+}
+
+/// Find a manifest in the document by label (or instance_id). Used to resolve nested ingredients.
+fn find_manifest_by_label<'a>(
+    manifest_value: &'a serde_json::Value,
+    label: &str,
+) -> Option<&'a serde_json::Value> {
+    let arr = manifest_value.get("manifests")?.as_array()?;
+    arr.iter().find(|m| {
+        m.get("label").and_then(|v| v.as_str()) == Some(label)
+            || m.get("claim.v2")
+                .or_else(|| m.get("claim"))
+                .and_then(|c| c.get("instanceID").or_else(|| c.get("instance_id")))
+                .and_then(|v| v.as_str())
+                == Some(label)
+    })
+}
+
+/// Get nested manifest for an ingredient (if this ingredient is a C2PA asset, its manifest may be in manifests[]).
+/// Resolves by active_manifest / activeManifest first, then instance_id / documentID / label.
+fn nested_manifest_for_ingredient<'a>(
+    manifest_value: &'a serde_json::Value,
+    ingredient: &serde_json::Value,
+) -> Option<&'a serde_json::Value> {
+    let mut labels_to_try: Vec<&str> = Vec::new();
+    if let Some(s) = ingredient.get("active_manifest").and_then(|v| v.as_str()) {
+        labels_to_try.push(s);
+    }
+    if let Some(s) = ingredient.get("activeManifest").and_then(|v| v.as_str()) {
+        labels_to_try.push(s);
+    }
+    if let Some(s) = ingredient
+        .get("activeManifest")
+        .and_then(|o| o.get("uri"))
+        .and_then(|v| v.as_str())
+    {
+        labels_to_try.push(s);
+    }
+    for key in ["instanceID", "instance_id", "documentID", "label"] {
+        if let Some(s) = ingredient.get(key).and_then(|v| v.as_str()) {
+            labels_to_try.push(s);
+        }
+    }
+    for label in labels_to_try {
+        if let Some(m) = find_manifest_by_label(manifest_value, label) {
+            return Some(m);
+        }
+    }
+    None
+}
+
+/// Extract digital source type from a manifest: look for a c2pa.actions or c2pa.actions.v2 assertion
+/// (it has an "actions" array); find an action with "action": "c2pa.created" and "digitalSourceType";
+/// return the last segment of the digitalSourceType URL.
+fn manifest_digital_source_type(manifest_obj: &serde_json::Value) -> Option<String> {
+    let try_actions_array = |actions: &serde_json::Value| -> Option<String> {
+        let arr = actions.as_array()?;
+        for act in arr {
+            if act.get("action").and_then(|v| v.as_str()) != Some("c2pa.created") {
+                continue;
+            }
+            let url = act.get("digitalSourceType").and_then(|v| v.as_str())?;
+            return Some(url.split('/').filter(|s| !s.is_empty()).last()?.to_string());
+        }
+        None
+    };
+
+    let try_assertions_obj = |assertions: &serde_json::Value| -> Option<String> {
+        let obj = assertions.as_object()?;
+        for key in ["c2pa.actions.v2", "c2pa.actions"] {
+            let assertion = obj.get(key)?;
+            if let Some(actions) = assertion.get("actions") {
+                if let Some(s) = try_actions_array(actions) {
+                    return Some(s);
+                }
+            }
+        }
+        None
+    };
+
+    let try_assertions_any = |assertions: &serde_json::Value| -> Option<String> {
+        if let Some(s) = try_assertions_obj(assertions) {
+            return Some(s);
+        }
+        if let Some(arr) = assertions.as_array() {
+            for a in arr {
+                let label = a.get("label").and_then(|v| v.as_str())?;
+                if label != "c2pa.actions" && label != "c2pa.actions.v2" {
+                    continue;
+                }
+                let data = a.get("data")?;
+                if let Some(actions) = data.get("actions") {
+                    if let Some(s) = try_actions_array(actions) {
+                        return Some(s);
+                    }
+                }
+            }
+        }
+        None
+    };
+
+    if let Some(assertions) = manifest_obj.get("assertions") {
+        if let Some(s) = try_assertions_any(assertions) {
+            return Some(s);
+        }
+    }
+    if let Some(claim) = manifest_obj
+        .get("claim.v2")
+        .or_else(|| manifest_obj.get("claim"))
+    {
+        if let Some(assertions) = claim.get("assertions") {
+            if let Some(s) = try_assertions_any(assertions) {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
+/// Get title or identifier for an ingredient or manifest
+fn ingredient_display_name(ing: &serde_json::Value) -> String {
+    ing.get("title")
+        .or_else(|| ing.get("dc:title"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            ing.get("instanceID")
+                .or_else(|| ing.get("instance_id"))
+                .or_else(|| ing.get("documentID"))
+                .or_else(|| ing.get("label"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "(unnamed)".to_string())
+}
+
+/// Recursively display manifest → ingredients tree. Root = active manifest, children = ingredients
+/// with relationship (parentOf, componentOf, inputOf); recurse into nested ingredients.
+fn display_manifest_ingredient_tree(
+    ui: &mut egui::Ui,
+    manifest_value: &serde_json::Value,
+    active_label: &str,
+) {
+    // Resolve active manifest: either from manifests[] or use root as single claim
+    let active_manifest = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        })
+        .or_else(|| {
+            if manifest_value.get("claim_generator_info").is_some()
+                || manifest_value.get("title").is_some()
+            {
+                Some(manifest_value)
+            } else {
+                None
+            }
+        });
+
+    let active_manifest = match active_manifest {
+        Some(m) => m,
+        None => {
+            ui.colored_label(
+                egui::Color32::from_rgb(200, 100, 100),
+                "Could not find active manifest in document.",
+            );
+            return;
+        }
+    };
+
+    let root_title = active_manifest
+        .get("claim.v2")
+        .or_else(|| active_manifest.get("claim"))
+        .and_then(|c| c.get("title").or_else(|| c.get("dc:title")))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            active_manifest
+                .get("title")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| active_label.to_string());
+
+    egui::CollapsingHeader::new(
+        egui::RichText::new(format!("📜 Active Manifest: {}", root_title))
+            .size(15.0)
+            .color(egui::Color32::from_rgb(200, 160, 50)),
+    )
+    .default_open(true)
+    .show(ui, |ui| {
+        // Root manifest details: label, claim generator if present
+        if let Some(claim) = active_manifest
+            .get("claim.v2")
+            .or_else(|| active_manifest.get("claim"))
+        {
+            if let Some(gen) = claim
+                .get("claim_generator")
+                .or_else(|| claim.get("claimGenerator"))
+            {
+                if let Some(s) = gen.as_str() {
+                    ui.label(
+                        egui::RichText::new(format!("Claim generator: {}", s))
+                            .size(12.0)
+                            .color(egui::Color32::from_rgb(180, 180, 180)),
+                    );
+                }
+            }
+        }
+        if let Some(label) = active_manifest.get("label").and_then(|v| v.as_str()) {
+            ui.label(
+                egui::RichText::new(format!("Label: {}", label))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(180, 180, 180)),
+            );
+        }
+        let ingredients = collect_ingredients_from_manifest(active_manifest);
+        if let Some(dst) = manifest_digital_source_type(active_manifest) {
+            ui.label(
+                egui::RichText::new(format!("Digital source type: {}", dst))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(180, 180, 180)),
+            );
+        } else {
+            for ing in &ingredients {
+                if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ing) {
+                    if let Some(dst) = manifest_digital_source_type(nested) {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Digital source type: {} (from ingredient manifest)",
+                                dst
+                            ))
+                            .size(12.0)
+                            .color(egui::Color32::from_rgb(180, 180, 180)),
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+        ui.add_space(4.0);
+        if ingredients.is_empty() {
+            ui.label("(no ingredients)");
+            return;
+        }
+        for ing in ingredients {
+            render_ingredient_node(ui, manifest_value, ing, 0);
+        }
+    });
+}
+
+/// Render one ingredient node with relationship (parentOf/componentOf/inputOf), details, and optional nested ingredients
+fn render_ingredient_node(
+    ui: &mut egui::Ui,
+    manifest_value: &serde_json::Value,
+    ingredient: &serde_json::Value,
+    depth: usize,
+) {
+    let relationship = ingredient
+        .get("relationship")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let name = ingredient_display_name(ingredient);
+    let indent = "  ".repeat(depth);
+
+    let badge_color = match relationship {
+        "parentOf" => egui::Color32::from_rgb(100, 180, 255),
+        "componentOf" => egui::Color32::from_rgb(120, 220, 120),
+        "inputOf" => egui::Color32::from_rgb(255, 200, 100),
+        _ => egui::Color32::from_rgb(180, 180, 180),
+    };
+
+    let nested_manifest = nested_manifest_for_ingredient(manifest_value, ingredient);
+    let nested_ingredients: Vec<_> = nested_manifest
+        .map(|m| collect_ingredients_from_manifest(m))
+        .unwrap_or_default();
+    let has_nested = !nested_ingredients.is_empty();
+
+    let header_text = format!("{}[{}] {}", indent, relationship, name);
+
+    if has_nested {
+        egui::CollapsingHeader::new(
+            egui::RichText::new(header_text)
+                .size(14.0)
+                .color(badge_color),
+        )
+        .default_open(true)
+        .show(ui, |ui| {
+            ingredient_node_details(ui, ingredient);
+            ui.add_space(4.0);
+            for ing in &nested_ingredients {
+                render_ingredient_node(ui, manifest_value, ing, depth + 1);
+            }
+        });
+    } else {
+        egui::CollapsingHeader::new(
+            egui::RichText::new(header_text)
+                .size(14.0)
+                .color(badge_color),
+        )
+        .default_open(true)
+        .show(ui, |ui| {
+            ingredient_node_details(ui, ingredient);
+        });
+    }
+}
+
+/// Show title, format, instance_id/label, and active manifest (if any) for an ingredient
+fn ingredient_node_details(ui: &mut egui::Ui, ingredient: &serde_json::Value) {
+    let gray = egui::Color32::from_rgb(160, 160, 160);
+    let small = 12.0f32;
+    if let Some(s) = ingredient
+        .get("title")
+        .or_else(|| ingredient.get("dc:title"))
+        .and_then(|v| v.as_str())
+    {
+        ui.label(
+            egui::RichText::new(format!("Title: {}", s))
+                .size(small)
+                .color(gray),
+        );
+    }
+    if let Some(s) = ingredient.get("format").and_then(|v| v.as_str()) {
+        ui.label(
+            egui::RichText::new(format!("Format: {}", s))
+                .size(small)
+                .color(gray),
+        );
+    }
+    let id = ingredient
+        .get("instanceID")
+        .or_else(|| ingredient.get("instance_id"))
+        .or_else(|| ingredient.get("documentID"))
+        .or_else(|| ingredient.get("label"))
+        .and_then(|v| v.as_str());
+    if let Some(s) = id {
+        ui.label(
+            egui::RichText::new(format!("Instance ID: {}", s))
+                .size(small)
+                .color(gray),
+        );
+    }
+    if let Some(label) = ingredient
+        .get("active_manifest")
+        .and_then(|v| v.as_str())
+        .or_else(|| ingredient.get("activeManifest").and_then(|v| v.as_str()))
+    {
+        ui.label(
+            egui::RichText::new(format!("Active manifest: {}", label))
+                .size(small)
+                .color(gray),
+        );
+    } else if ingredient
+        .get("activeManifest")
+        .and_then(|v| v.as_object())
+        .is_some()
+    {
+        if let Some(uri) = ingredient
+            .get("activeManifest")
+            .and_then(|o| o.get("uri"))
+            .and_then(|v| v.as_str())
+        {
+            ui.label(
+                egui::RichText::new(format!("Active manifest: {}", uri))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+    }
+}
+
+/// Extract trust status from the active manifest (identified by label, not array index).
+fn get_trust_status(manifest_value: &serde_json::Value, active_label: &str) -> Option<String> {
+    let active_manifest = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        })
+        .or_else(|| {
+            if manifest_value.get("claim_generator_info").is_some()
+                || manifest_value.get("title").is_some()
+            {
+                Some(manifest_value)
+            } else {
+                None
+            }
+        })?;
+    active_manifest
         .get("status")?
         .get("trust")?
         .as_str()

@@ -506,8 +506,8 @@ fn extract_manifest(input_path: &Path, output_path: &Path, use_jpt_format: bool)
         println!("  Format: JPEG Trust");
     }
 
-    // Get the manifest JSON string based on format
-    let manifest_json = if use_jpt_format {
+    // Get the manifest JSON and parse to value; for JPT, enrich with claim_generator_info from Reader when missing in output
+    let json_value: JsonValue = if use_jpt_format {
         // Use JPEG Trust Reader
         let mut jpt_reader = JpegTrustReader::from_file(input_path).context(
             "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
@@ -526,7 +526,57 @@ fn extract_manifest(input_path: &Path, output_path: &Path, use_jpt_format: bool)
 
         println!("  Active manifest label: {}", active_label);
 
-        jpt_reader.json()
+        let json_str = jpt_reader.json();
+        let mut value: JsonValue =
+            serde_json::from_str(&json_str).context("Failed to parse JPT JSON")?;
+
+        // Check whether c2pa-rs already included claim_generator_info in claim.v2 for the active manifest (we never overwrite it).
+        let already_has_cgi = value
+            .get("manifests")
+            .and_then(|m| m.as_array())
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|m| m.get("label").and_then(|l| l.as_str()) == Some(active_label))
+            })
+            .and_then(|m| m.get("claim.v2"))
+            .and_then(|c| c.get("claim_generator_info"))
+            .is_some();
+
+        // If the library did not include claim_generator_info in claim.v2, add it from the Reader's
+        // active manifest so the extracted JSON is complete. We only insert when missing.
+        if !already_has_cgi {
+            if let Some(manifests) = value.get_mut("manifests").and_then(|m| m.as_array_mut()) {
+                if let Some(active_manifest) = jpt_reader.inner().active_manifest() {
+                    if let Some(cgi) = active_manifest.claim_generator_info.as_ref() {
+                        if let Ok(cgi_value) = serde_json::to_value(cgi) {
+                            for manifest_obj in manifests.iter_mut() {
+                                let label_matches = manifest_obj
+                                    .get("label")
+                                    .and_then(|l| l.as_str())
+                                    .map(|l| l == active_label)
+                                    .unwrap_or(false);
+                                if label_matches {
+                                    if let Some(claim_v2) = manifest_obj
+                                        .get_mut("claim.v2")
+                                        .and_then(|c| c.as_object_mut())
+                                    {
+                                        claim_v2
+                                            .insert("claim_generator_info".to_string(), cgi_value);
+                                        println!("  (claim_generator_info was missing in JPT output; added from Reader's manifest)");
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        println!("  (claim_generator_info missing in JPT output; Reader's manifest also has no claim_generator_info)");
+                    }
+                }
+            }
+        }
+        // Normalize JUMBF identifiers to proper URIs (dashed form -> slashes) in claim_generator_info and assertions.
+        crtool::normalize_jpt_jumbf_identifiers(&mut value);
+        value
     } else {
         // Use standard Reader
         let reader = Reader::from_file(input_path).context(
@@ -540,7 +590,8 @@ fn extract_manifest(input_path: &Path, output_path: &Path, use_jpt_format: bool)
 
         println!("  Active manifest label: {}", active_label);
 
-        reader.json()
+        let json_str = reader.json();
+        serde_json::from_str(&json_str).context("Failed to parse manifest JSON")?
     };
 
     // Determine the final output path
@@ -566,9 +617,7 @@ fn extract_manifest(input_path: &Path, output_path: &Path, use_jpt_format: bool)
         fs::create_dir_all(parent).context("Failed to create output directory")?;
     }
 
-    // Parse and re-serialize the JSON for pretty formatting
-    let json_value: serde_json::Value =
-        serde_json::from_str(&manifest_json).context("Failed to parse manifest JSON")?;
+    // Re-serialize the JSON for pretty formatting
     let pretty_json = serde_json::to_string_pretty(&json_value).context("Failed to format JSON")?;
 
     fs::write(&final_output_path, pretty_json)

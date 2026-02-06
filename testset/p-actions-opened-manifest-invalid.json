@@ -1,0 +1,35 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "p-actions-opened-manifest-invalid",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2026-01-17T14:44:19.231Z",
+                        "parameters": {
+                            "ingredientIds": [
+                                "test_ingredient"
+                            ]
+                        }
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients_from_files": [
+        {
+            "file_path": "test_ingredient_manifest-invalid.jpg",
+            "label": "test_ingredient",
+            "relationship": "parentOf"
+        }
+    ]
+}

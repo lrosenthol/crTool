@@ -1,0 +1,29 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "crTool/0.1.0",
+            "version": "0.1.0",
+            "icon": {
+                "format": "image/svg+xml",
+                "identifier": "logo.svg"
+            }
+        }
+    ],
+    "title": "p-actions-created-with-icon",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}
