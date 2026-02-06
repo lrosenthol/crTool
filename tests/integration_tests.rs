@@ -2015,6 +2015,7 @@ fn test_testset_manifests() -> Result<()> {
         "p-actions-softwareAgents",
         "p-actions-template",
         "p-actions-template-all",
+        "p-actions-template-icon",
         "p-actions-related",
         // Skipped: c2pa-rs fails to decode c2pa.actions.v2 with spatial change regions
         // "p-actions-changes-spatial",
