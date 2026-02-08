@@ -318,7 +318,7 @@ impl eframe::App for CrtoolApp {
                                     }
                                     _ => (
                                         "⚠️",
-                                        egui::Color32::from_rgb(200, 200, 200),
+                                        egui::Color32::from_rgb(128, 128, 128),
                                         trust_status.as_str(),
                                     ),
                                 };
@@ -668,6 +668,81 @@ fn manifest_digital_source_type(manifest_obj: &serde_json::Value) -> Option<Stri
     None
 }
 
+/// Extract claim type ("claim.v2" or "claim"), claim_generator string, and formatted claim_generator_info from a manifest object.
+fn manifest_claim_info(
+    manifest_obj: &serde_json::Value,
+) -> (Option<&'static str>, Option<String>, Option<String>) {
+    let (claim_type, claim_obj) = if manifest_obj.get("claim.v2").is_some() {
+        (Some("claim.v2"), manifest_obj.get("claim.v2"))
+    } else if manifest_obj.get("claim").is_some() {
+        (Some("claim"), manifest_obj.get("claim"))
+    } else {
+        (None, None)
+    };
+
+    let claim = match claim_obj {
+        Some(c) => c,
+        None => {
+            // Flat format: claim_generator_info at top level
+            let cgi = format_claim_generator_info(manifest_obj.get("claim_generator_info"));
+            return (None, None, cgi);
+        }
+    };
+
+    let gen = claim
+        .get("claim_generator")
+        .or_else(|| claim.get("claimGenerator"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let cgi = format_claim_generator_info(
+        claim
+            .get("claim_generator_info")
+            .or_else(|| manifest_obj.get("claim_generator_info")),
+    );
+    (claim_type, gen, cgi)
+}
+
+/// Format claim_generator_info (array or object) as a short string for display.
+fn format_claim_generator_info(cgi: Option<&serde_json::Value>) -> Option<String> {
+    let cgi = cgi?;
+    let arr = cgi.as_array();
+    let objs: Vec<&serde_json::Value> = if let Some(a) = arr {
+        a.iter().collect()
+    } else if cgi.get("name").is_some() || cgi.get("version").is_some() {
+        return Some(format_one_cgi_entry(cgi));
+    } else {
+        return None;
+    };
+    if objs.is_empty() {
+        return None;
+    }
+    let parts: Vec<String> = objs.iter().map(|o| format_one_cgi_entry(o)).collect();
+    Some(parts.join("; "))
+}
+
+fn format_one_cgi_entry(entry: &serde_json::Value) -> String {
+    let name = entry
+        .get("name")
+        .or_else(|| entry.get("title"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("—");
+    let version = entry.get("version").and_then(|v| v.as_str()).unwrap_or("");
+    if version.is_empty() {
+        name.to_string()
+    } else {
+        format!("{} {}", name, version)
+    }
+}
+
+/// Get trust status from a manifest object (status.trust).
+fn trust_status_from_manifest(manifest_obj: &serde_json::Value) -> Option<String> {
+    manifest_obj
+        .get("status")
+        .and_then(|s| s.get("trust"))
+        .and_then(|t| t.as_str())
+        .map(|s| s.to_string())
+}
+
 /// Get title or identifier for an ingredient or manifest
 fn ingredient_display_name(ing: &serde_json::Value) -> String {
     ing.get("title")
@@ -742,37 +817,55 @@ fn display_manifest_ingredient_tree(
     )
     .default_open(true)
     .show(ui, |ui| {
-        // Root manifest details: label, claim generator if present
-        if let Some(claim) = active_manifest
-            .get("claim.v2")
-            .or_else(|| active_manifest.get("claim"))
-        {
-            if let Some(gen) = claim
-                .get("claim_generator")
-                .or_else(|| claim.get("claimGenerator"))
-            {
-                if let Some(s) = gen.as_str() {
-                    ui.label(
-                        egui::RichText::new(format!("Claim generator: {}", s))
-                            .size(12.0)
-                            .color(egui::Color32::from_rgb(180, 180, 180)),
-                    );
-                }
-            }
+        // Root manifest details: claim type, claim generator, claim_generator_info, label
+        let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(active_manifest);
+        if let Some(ct) = claim_type {
+            ui.label(
+                egui::RichText::new(format!("Claim type: {}", ct))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(128, 128, 128)),
+            );
+        }
+        if let Some(ref gen) = claim_gen {
+            ui.label(
+                egui::RichText::new(format!("Claim generator: {}", gen))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(128, 128, 128)),
+            );
+        }
+        if let Some(ref info) = claim_gen_info {
+            ui.label(
+                egui::RichText::new(format!("Claim generator info: {}", info))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(128, 128, 128)),
+            );
         }
         if let Some(label) = active_manifest.get("label").and_then(|v| v.as_str()) {
             ui.label(
                 egui::RichText::new(format!("Label: {}", label))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(180, 180, 180)),
+                    .color(egui::Color32::from_rgb(128, 128, 128)),
             );
+        }
+        if let Some(trust) = trust_status_from_manifest(active_manifest) {
+            let (icon, color) = match trust.as_str() {
+                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
+                "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
+                _ => ("", egui::Color32::from_rgb(128, 128, 128)),
+            };
+            let text = if icon.is_empty() {
+                format!("Trust: {}", trust)
+            } else {
+                format!("Trust: {} {}", icon, trust)
+            };
+            ui.label(egui::RichText::new(text).size(12.0).color(color));
         }
         let ingredients = collect_ingredients_from_manifest(active_manifest);
         if let Some(dst) = manifest_digital_source_type(active_manifest) {
             ui.label(
                 egui::RichText::new(format!("Digital source type: {}", dst))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(180, 180, 180)),
+                    .color(egui::Color32::from_rgb(128, 128, 128)),
             );
         } else {
             for ing in &ingredients {
@@ -784,7 +877,7 @@ fn display_manifest_ingredient_tree(
                                 dst
                             ))
                             .size(12.0)
-                            .color(egui::Color32::from_rgb(180, 180, 180)),
+                            .color(egui::Color32::from_rgb(128, 128, 128)),
                         );
                         break;
                     }
@@ -820,7 +913,7 @@ fn render_ingredient_node(
         "parentOf" => egui::Color32::from_rgb(100, 180, 255),
         "componentOf" => egui::Color32::from_rgb(120, 220, 120),
         "inputOf" => egui::Color32::from_rgb(255, 200, 100),
-        _ => egui::Color32::from_rgb(180, 180, 180),
+        _ => egui::Color32::from_rgb(128, 128, 128),
     };
 
     let nested_manifest = nested_manifest_for_ingredient(manifest_value, ingredient);
@@ -839,7 +932,7 @@ fn render_ingredient_node(
         )
         .default_open(true)
         .show(ui, |ui| {
-            ingredient_node_details(ui, ingredient);
+            ingredient_node_details(ui, manifest_value, ingredient);
             ui.add_space(4.0);
             for ing in &nested_ingredients {
                 render_ingredient_node(ui, manifest_value, ing, depth + 1);
@@ -853,14 +946,18 @@ fn render_ingredient_node(
         )
         .default_open(true)
         .show(ui, |ui| {
-            ingredient_node_details(ui, ingredient);
+            ingredient_node_details(ui, manifest_value, ingredient);
         });
     }
 }
 
-/// Show title, format, instance_id/label, and active manifest (if any) for an ingredient
-fn ingredient_node_details(ui: &mut egui::Ui, ingredient: &serde_json::Value) {
-    let gray = egui::Color32::from_rgb(160, 160, 160);
+/// Show title, format, instance_id/label, active manifest, claim generator info, claim type, and trust status for an ingredient.
+fn ingredient_node_details(
+    ui: &mut egui::Ui,
+    manifest_value: &serde_json::Value,
+    ingredient: &serde_json::Value,
+) {
+    let gray = egui::Color32::from_rgb(128, 128, 128);
     let small = 12.0f32;
     if let Some(s) = ingredient
         .get("title")
@@ -915,6 +1012,58 @@ fn ingredient_node_details(ui: &mut egui::Ui, ingredient: &serde_json::Value) {
         {
             ui.label(
                 egui::RichText::new(format!("Active manifest: {}", uri))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+    }
+    // Claim generator / claim type / digital source type from nested manifest (if this ingredient is a C2PA asset)
+    if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ingredient) {
+        if let Some(dst) = manifest_digital_source_type(nested) {
+            ui.label(
+                egui::RichText::new(format!("Digital source type: {}", dst))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+        let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(nested);
+        if let Some(ct) = claim_type {
+            ui.label(
+                egui::RichText::new(format!("Claim type: {}", ct))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+        if let Some(ref gen) = claim_gen {
+            ui.label(
+                egui::RichText::new(format!("Claim generator: {}", gen))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+        if let Some(ref info) = claim_gen_info {
+            ui.label(
+                egui::RichText::new(format!("Claim generator info: {}", info))
+                    .size(small)
+                    .color(gray),
+            );
+        }
+        // Trust status for ingredient (from nested manifest)
+        if let Some(trust) = trust_status_from_manifest(nested) {
+            let (icon, color) = match trust.as_str() {
+                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
+                "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
+                _ => ("", gray),
+            };
+            let text = if icon.is_empty() {
+                format!("Trust: {}", trust)
+            } else {
+                format!("Trust: {} {}", icon, trust)
+            };
+            ui.label(egui::RichText::new(text).size(small).color(color));
+        } else {
+            ui.label(
+                egui::RichText::new("Trust: — (no status)")
                     .size(small)
                     .color(gray),
             );
