@@ -220,6 +220,73 @@ pub fn default_schema_path() -> std::path::PathBuf {
         .join("indicators-schema.json")
 }
 
+/// Converts dashed JUMBF identifier to proper URI form (with '/').
+/// e.g. `self#jumbf=-c2pa-urn-c2pa-UUID-c2pa.assertions-c2pa.icon` ->
+///      `self#jumbf=/c2pa/urn:c2pa:UUID/c2pa.assertions/c2pa.icon`
+pub fn normalize_jumbf_identifier(identifier: &str) -> String {
+    const PREFIX_DASHED: &str = "self#jumbf=-c2pa-urn-c2pa-";
+    const PREFIX_URI: &str = "self#jumbf=/c2pa/urn:c2pa:";
+    const SUFFIX_DASHED: &str = "-c2pa.assertions-c2pa.icon";
+    const SUFFIX_URI: &str = "/c2pa.assertions/c2pa.icon";
+    if identifier.starts_with(PREFIX_DASHED) && identifier.ends_with(SUFFIX_DASHED) {
+        let uuid_part = &identifier[PREFIX_DASHED.len()..identifier.len() - SUFFIX_DASHED.len()];
+        format!("{}{}{}", PREFIX_URI, uuid_part, SUFFIX_URI)
+    } else {
+        identifier.to_string()
+    }
+}
+
+/// Normalize JUMBF identifiers (dashed form -> proper URI with '/') in JPT manifest JSON in place.
+/// Applies to: claim_generator_info[].icon.identifier and assertions (e.g. c2pa.icon).identifier.
+pub fn normalize_jpt_jumbf_identifiers(value: &mut serde_json::Value) {
+    let Some(manifests) = value.get_mut("manifests").and_then(|m| m.as_array_mut()) else {
+        return;
+    };
+    for manifest_obj in manifests.iter_mut() {
+        if let Some(claim_v2) = manifest_obj
+            .get_mut("claim.v2")
+            .and_then(|c| c.as_object_mut())
+        {
+            if let Some(cgi) = claim_v2
+                .get_mut("claim_generator_info")
+                .and_then(|c| c.as_array_mut())
+            {
+                for entry in cgi.iter_mut() {
+                    if let Some(icon) = entry.get_mut("icon").and_then(|i| i.as_object_mut()) {
+                        if let Some(serde_json::Value::String(id)) = icon.get("identifier") {
+                            let normalized = normalize_jumbf_identifier(id);
+                            if normalized != *id {
+                                icon.insert(
+                                    "identifier".to_string(),
+                                    serde_json::Value::String(normalized),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(assertions) = manifest_obj
+            .get_mut("assertions")
+            .and_then(|a| a.as_object_mut())
+        {
+            for (_label, assertion_value) in assertions.iter_mut() {
+                if let Some(obj) = assertion_value.as_object_mut() {
+                    if let Some(serde_json::Value::String(id)) = obj.get("identifier") {
+                        let normalized = normalize_jumbf_identifier(id);
+                        if normalized != *id {
+                            obj.insert(
+                                "identifier".to_string(),
+                                serde_json::Value::String(normalized),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

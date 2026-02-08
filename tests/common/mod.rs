@@ -14,7 +14,9 @@ use anyhow::Result;
 use c2pa::{
     Builder, CallbackSigner, Ingredient, JpegTrustReader, Reader, Relationship, SigningAlg,
 };
+use std::collections::HashSet;
 use std::fs;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 /// Path to the crTool CLI binary (when built as part of the workspace).
@@ -70,6 +72,85 @@ pub fn output_dir() -> PathBuf {
     dir
 }
 
+/// Collect resource identifiers (icon, thumbnail, data) from manifest JSON so we can load
+/// them from the manifest's directory and add to the builder before signing.
+fn collect_manifest_resource_identifiers(manifest: &serde_json::Value) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    // claim_generator_info: array or single object with optional icon.identifier
+    if let Some(cgi) = manifest.get("claim_generator_info") {
+        let entries: Vec<&serde_json::Value> = cgi
+            .as_array()
+            .map(|a| a.iter().collect())
+            .unwrap_or_else(|| vec![cgi]);
+        for entry in entries {
+            if let Some(icon) = entry.get("icon").and_then(|i| i.get("identifier")) {
+                if let Some(s) = icon.as_str() {
+                    ids.insert(s.to_string());
+                }
+            }
+        }
+    }
+    // thumbnail: { identifier }
+    if let Some(t) = manifest.get("thumbnail").and_then(|t| t.get("identifier")) {
+        if let Some(s) = t.as_str() {
+            ids.insert(s.to_string());
+        }
+    }
+    // ingredients[].thumbnail.identifier and ingredients[].data.identifier
+    if let Some(ingredients) = manifest.get("ingredients").and_then(|v| v.as_array()) {
+        for ing in ingredients {
+            if let Some(t) = ing.get("thumbnail").and_then(|t| t.get("identifier")) {
+                if let Some(s) = t.as_str() {
+                    ids.insert(s.to_string());
+                }
+            }
+            if let Some(d) = ing.get("data").and_then(|d| d.get("identifier")) {
+                if let Some(s) = d.as_str() {
+                    ids.insert(s.to_string());
+                }
+            }
+        }
+    }
+    // assertions[].data.templates[].icon.identifier (c2pa.actions.v2 action template icons)
+    if let Some(assertions) = manifest.get("assertions").and_then(|v| v.as_array()) {
+        for assertion in assertions {
+            let data = assertion.get("data").and_then(|d| d.as_object());
+            if let Some(templates) = data
+                .and_then(|d| d.get("templates"))
+                .and_then(|t| t.as_array())
+            {
+                for template in templates {
+                    if let Some(icon) = template.get("icon").and_then(|i| i.get("identifier")) {
+                        if let Some(s) = icon.as_str() {
+                            ids.insert(s.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ids
+}
+
+/// Load manifest-referenced resources (icons, thumbnails, etc.) from a base directory
+/// and add them to the builder. Paths are resolved relative to base_dir.
+fn add_manifest_resources_from_dir(
+    builder: &mut Builder,
+    manifest_json: &str,
+    base_dir: &Path,
+) -> Result<()> {
+    let manifest: serde_json::Value = serde_json::from_str(manifest_json)?;
+    let identifiers = collect_manifest_resource_identifiers(&manifest);
+    for id in identifiers {
+        let path = base_dir.join(&id);
+        if path.exists() && path.is_file() {
+            let data = fs::read(&path)?;
+            builder.add_resource(&id, Cursor::new(data))?;
+        }
+    }
+    Ok(())
+}
+
 /// Helper function to sign a file with a manifest
 #[allow(dead_code)]
 pub fn sign_file_with_manifest(
@@ -88,10 +169,13 @@ pub fn sign_file_with_manifest(
     // Create the builder from JSON
     let mut builder = Builder::from_json(&manifest_json)?;
 
-    // Process any ingredients_from_files that may be in the manifest
-    // Use the manifest's directory as the base for resolving ingredient paths
+    // Use the manifest's directory as the base for resolving ingredient and resource paths
     let ingredients_base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
 
+    // Load any resources (e.g. claim_generator_info icon) referenced by identifier
+    add_manifest_resources_from_dir(&mut builder, &manifest_json, ingredients_base_dir)?;
+
+    // Process any ingredients_from_files that may be in the manifest
     process_ingredients_with_thumbnails(&mut builder, &manifest_json, ingredients_base_dir, false)?;
 
     // Use the same test signer approach as c2pa-rs tests
@@ -160,6 +244,10 @@ fn sign_file_with_manifest_and_ingredients_impl(
 
     // Create the builder from JSON
     let mut builder = Builder::from_json(&manifest_json)?;
+
+    // Load any resources (e.g. claim_generator_info icon) referenced by identifier
+    let manifest_base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    add_manifest_resources_from_dir(&mut builder, &manifest_json, manifest_base_dir)?;
 
     // Process ingredients with file paths
     process_ingredients_with_thumbnails(
