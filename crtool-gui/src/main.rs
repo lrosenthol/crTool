@@ -18,8 +18,24 @@ use crtool::{
     ValidationResult,
 };
 use eframe::egui;
+use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
 use egui_twemoji::EmojiLabel;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
+
+/// Syntax definition for JSON (keywords true/false/null) for the code editor.
+fn json_syntax() -> Syntax {
+    Syntax {
+        language: "json",
+        case_sensitive: true,
+        comment: "",
+        comment_multiline: ["", ""],
+        hyperlinks: BTreeSet::new(),
+        keywords: BTreeSet::from(["false", "null", "true"]),
+        types: BTreeSet::new(),
+        special: BTreeSet::new(),
+    }
+}
 
 #[cfg(target_os = "macos")]
 mod macos_open_document;
@@ -86,6 +102,8 @@ struct CrtoolApp {
     validation_result: Option<ValidationResult>,
     /// Whether to show the raw JSON (replaces tree + manifest data when on)
     show_raw_json: bool,
+    /// Buffer for raw JSON view (read-only; refreshed from manifest each frame)
+    raw_json_buffer: String,
     /// Schema path (defaults to bundled schema)
     schema_path: PathBuf,
     /// Fraction of (content width minus resize handle) for the left panel (0.5 = 50%). Used for side-by-side view.
@@ -103,6 +121,7 @@ impl CrtoolApp {
             extraction_result: None,
             validation_result: None,
             show_raw_json: false,
+            raw_json_buffer: String::new(),
             schema_path: default_schema_path(),
             split_ratio: 0.5,
         };
@@ -419,20 +438,17 @@ impl eframe::App for CrtoolApp {
                             EmojiLabel::new(egui::RichText::new("📋 Raw JSON:").size(17.0))
                                 .show(ui);
 
-                            egui::ScrollArea::vertical()
-                                .id_salt("raw_json")
-                                .show(ui, |ui| {
-                                    let theme =
-                                        egui_extras::syntax_highlighting::CodeTheme::from_style(
-                                            ui.style(),
-                                        );
-                                    egui_extras::syntax_highlighting::code_view_ui(
-                                        ui,
-                                        &theme,
-                                        &manifest.manifest_json,
-                                        "json",
-                                    );
-                                });
+                            // Read-only: refresh buffer from manifest each frame so edits are discarded
+                            self.raw_json_buffer = manifest.manifest_json.clone();
+                            let mut editor = CodeEditor::default()
+                                .id_source("raw_json")
+                                .with_rows(28)
+                                .with_ui_fontsize(ui)
+                                .with_theme(ColorTheme::AYU)
+                                .with_syntax(json_syntax())
+                                .with_numlines(false)
+                                .vscroll(true);
+                            editor.show(ui, &mut self.raw_json_buffer);
                         } else {
                             // Side by side: Manifest Data (left), resizer, Tree (right); 50/50 by default, resizable via drag
                             ui.separator();
