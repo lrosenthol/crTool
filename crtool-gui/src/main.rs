@@ -19,6 +19,7 @@ use crtool::{
 };
 use eframe::egui;
 use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
+use egui_json_tree::{DefaultExpand, JsonTree};
 use egui_twemoji::EmojiLabel;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -472,7 +473,11 @@ impl eframe::App for CrtoolApp {
                                         egui::ScrollArea::vertical()
                                             .id_salt("manifest_data")
                                             .show(ui, |ui| {
-                                                display_json_tree(ui, &manifest.manifest_value, 0);
+                                                // Force content width to match panel so tree fills on init (not only after resize)
+                                                ui.set_min_width((left_width - 16.0).max(0.0));
+                                                JsonTree::new("manifest-data-tree", &manifest.manifest_value)
+                                                    .default_expand(DefaultExpand::ToLevel(2))
+                                                    .show(ui);
                                             });
                                     },
                                 );
@@ -1167,85 +1172,4 @@ fn get_trust_status(manifest_value: &serde_json::Value, active_label: &str) -> O
         .get("trust")?
         .as_str()
         .map(|s| s.to_string())
-}
-
-/// Recursively display a JSON value as a tree
-fn display_json_tree(ui: &mut egui::Ui, value: &serde_json::Value, depth: usize) {
-    use serde_json::Value;
-
-    let indent = "  ".repeat(depth);
-
-    match value {
-        Value::Object(map) => {
-            for (key, val) in map {
-                match val {
-                    Value::Object(_) | Value::Array(_) => {
-                        egui::CollapsingHeader::new(format!("{}{}", indent, key))
-                            .default_open(depth < 2)
-                            .show(ui, |ui| {
-                                display_json_tree(ui, val, depth + 1);
-                            });
-                    }
-                    _ => {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{}{}: ", indent, key));
-                            display_json_value(ui, val);
-                        });
-                    }
-                }
-            }
-        }
-        Value::Array(arr) => {
-            for (idx, val) in arr.iter().enumerate() {
-                match val {
-                    Value::Object(_) | Value::Array(_) => {
-                        egui::CollapsingHeader::new(format!("{}[{}]", indent, idx))
-                            .default_open(depth < 2)
-                            .show(ui, |ui| {
-                                display_json_tree(ui, val, depth + 1);
-                            });
-                    }
-                    _ => {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{}[{}]: ", indent, idx));
-                            display_json_value(ui, val);
-                        });
-                    }
-                }
-            }
-        }
-        _ => {
-            display_json_value(ui, value);
-        }
-    }
-}
-
-/// Display a simple JSON value (not object or array) - using standard colors
-fn display_json_value(ui: &mut egui::Ui, value: &serde_json::Value) {
-    use serde_json::Value;
-
-    match value {
-        Value::String(s) => {
-            ui.label(
-                egui::RichText::new(format!("\"{}\"", s))
-                    .color(egui::Color32::from_rgb(206, 145, 120)),
-            );
-        }
-        Value::Number(n) => {
-            ui.label(
-                egui::RichText::new(n.to_string()).color(egui::Color32::from_rgb(181, 206, 168)),
-            );
-        }
-        Value::Bool(b) => {
-            ui.label(
-                egui::RichText::new(b.to_string()).color(egui::Color32::from_rgb(86, 156, 214)),
-            );
-        }
-        Value::Null => {
-            ui.label(egui::RichText::new("null").color(egui::Color32::from_rgb(86, 156, 214)));
-        }
-        _ => {
-            ui.label(value.to_string());
-        }
-    }
 }
