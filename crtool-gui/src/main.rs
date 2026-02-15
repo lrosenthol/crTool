@@ -18,8 +18,25 @@ use crtool::{
     ValidationResult,
 };
 use eframe::egui;
+use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
+use egui_json_tree::{DefaultExpand, JsonTree};
 use egui_twemoji::EmojiLabel;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
+
+/// Syntax definition for JSON (keywords true/false/null) for the code editor.
+fn json_syntax() -> Syntax {
+    Syntax {
+        language: "json",
+        case_sensitive: true,
+        comment: "",
+        comment_multiline: ["", ""],
+        hyperlinks: BTreeSet::new(),
+        keywords: BTreeSet::from(["false", "null", "true"]),
+        types: BTreeSet::new(),
+        special: BTreeSet::new(),
+    }
+}
 
 #[cfg(target_os = "macos")]
 mod macos_open_document;
@@ -70,6 +87,13 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
+/// Width of the draggable resize handle between the two columns (px).
+const RESIZE_HANDLE_WIDTH: f32 = 6.0;
+
+/// Minimum fraction of total width for each column (so neither collapses).
+const MIN_PANEL_RATIO: f32 = 0.15;
+const MAX_PANEL_RATIO: f32 = 0.85;
+
 struct CrtoolApp {
     /// Currently loaded file path
     selected_file: Option<PathBuf>,
@@ -79,8 +103,12 @@ struct CrtoolApp {
     validation_result: Option<ValidationResult>,
     /// Whether to show the raw JSON (replaces tree + manifest data when on)
     show_raw_json: bool,
+    /// Buffer for raw JSON view (read-only; refreshed from manifest each frame)
+    raw_json_buffer: String,
     /// Schema path (defaults to bundled schema)
     schema_path: PathBuf,
+    /// Fraction of (content width minus resize handle) for the left panel (0.5 = 50%). Used for side-by-side view.
+    split_ratio: f32,
 }
 
 impl CrtoolApp {
@@ -94,7 +122,9 @@ impl CrtoolApp {
             extraction_result: None,
             validation_result: None,
             show_raw_json: false,
+            raw_json_buffer: String::new(),
             schema_path: default_schema_path(),
+            split_ratio: 0.5,
         };
         if app.selected_file.is_some() {
             app.extract_and_validate();
@@ -409,58 +439,106 @@ impl eframe::App for CrtoolApp {
                             EmojiLabel::new(egui::RichText::new("📋 Raw JSON:").size(17.0))
                                 .show(ui);
 
-                            egui::ScrollArea::vertical()
-                                .id_salt("raw_json")
-                                .show(ui, |ui| {
-                                    let theme =
-                                        egui_extras::syntax_highlighting::CodeTheme::from_style(
-                                            ui.style(),
-                                        );
-                                    egui_extras::syntax_highlighting::code_view_ui(
-                                        ui,
-                                        &theme,
-                                        &manifest.manifest_json,
-                                        "json",
-                                    );
-                                });
+                            // Read-only: refresh buffer from manifest each frame so edits are discarded
+                            self.raw_json_buffer = manifest.manifest_json.clone();
+                            let mut editor = CodeEditor::default()
+                                .id_source("raw_json")
+                                .with_rows(28)
+                                .with_ui_fontsize(ui)
+                                .with_theme(ColorTheme::AYU)
+                                .with_syntax(json_syntax())
+                                .with_numlines(false)
+                                .vscroll(true);
+                            editor.show(ui, &mut self.raw_json_buffer);
                         } else {
-                            // Side by side: Manifest Data (left), Tree (right); fill full height
+                            // Side by side: Manifest Data (left), resizer, Tree (right); 50/50 by default, resizable via drag
                             ui.separator();
                             let fill_height = ui.available_height();
+                            let total_width = ui.available_width();
+                            let content_width = (total_width - RESIZE_HANDLE_WIDTH).max(0.0);
+                            let left_width = content_width * self.split_ratio;
+                            let right_width = content_width - left_width;
+
                             ui.horizontal(|ui| {
-                                // Left: Manifest Data
-                                ui.vertical(|ui| {
-                                    ui.set_min_height(fill_height);
-                                    ui.set_min_width(ui.available_width() / 2.0);
-                                    EmojiLabel::new(
-                                        egui::RichText::new("📊 Manifest Data").size(16.0),
-                                    )
-                                    .show(ui);
-                                    egui::ScrollArea::vertical()
-                                        .id_salt("manifest_data")
-                                        .show(ui, |ui| {
-                                            display_json_tree(ui, &manifest.manifest_value, 0);
-                                        });
-                                });
-                                // Right: Tree view
-                                ui.vertical(|ui| {
-                                    ui.set_min_height(fill_height);
-                                    ui.set_min_width(ui.available_width());
-                                    EmojiLabel::new(
-                                        egui::RichText::new("🌳 Manifest & Ingredients Tree")
-                                            .size(16.0),
-                                    )
-                                    .show(ui);
-                                    egui::ScrollArea::vertical()
-                                        .id_salt("tree_view")
-                                        .show(ui, |ui| {
-                                            display_manifest_ingredient_tree(
-                                                ui,
-                                                &manifest.manifest_value,
-                                                &manifest.active_label,
-                                            );
-                                        });
-                                });
+                                // Left: Manifest Data — claim full left_width so layout advances correctly (egui advances by child min_rect)
+                                let left_response = ui.allocate_ui_with_layout(
+                                    egui::vec2(left_width, fill_height),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| {
+                                        ui.set_min_size(egui::vec2(left_width, fill_height));
+                                        EmojiLabel::new(
+                                            egui::RichText::new("📊 Manifest Data").size(16.0),
+                                        )
+                                        .show(ui);
+                                        egui::ScrollArea::vertical()
+                                            .id_salt("manifest_data")
+                                            .show(ui, |ui| {
+                                                // Force content width to match panel so tree fills on init (not only after resize)
+                                                ui.set_min_width((left_width - 16.0).max(0.0));
+                                                JsonTree::new("manifest-data-tree", &manifest.manifest_value)
+                                                    .default_expand(DefaultExpand::ToLevel(2))
+                                                    .show(ui);
+                                            });
+                                    },
+                                );
+
+                                // Resize handle: stable id so drag is tracked across frames; draggable divider
+                                let left_rect = left_response.response.rect;
+                                let resize_rect = egui::Rect::from_min_size(
+                                    left_rect.right_top(),
+                                    egui::vec2(RESIZE_HANDLE_WIDTH, fill_height),
+                                );
+                                let resize_response = ui.push_id("manifest_tree_resize", |ui| {
+                                    ui.allocate_rect(resize_rect, egui::Sense::drag())
+                                })
+                                .inner;
+                                if resize_response.hovered() {
+                                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                                }
+                                if resize_response.dragged() {
+                                    if let Some(pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
+                                        let panels_left = left_rect.left();
+                                        let new_ratio = (pos.x - panels_left) / content_width;
+                                        self.split_ratio =
+                                            new_ratio.clamp(MIN_PANEL_RATIO, MAX_PANEL_RATIO);
+                                    }
+                                }
+                                // Visible divider line
+                                let painter = ui.painter_at(resize_rect);
+                                let line_x = resize_rect.center().x;
+                                painter.line_segment(
+                                    [
+                                        egui::pos2(line_x, resize_rect.top()),
+                                        egui::pos2(line_x, resize_rect.bottom()),
+                                    ],
+                                    egui::Stroke::new(
+                                        1.0,
+                                        ui.visuals().widgets.noninteractive.fg_stroke.color,
+                                    ),
+                                );
+
+                                // Right: Tree view — claim full right_width so it gets exactly the remaining space
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(right_width, fill_height),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| {
+                                        ui.set_min_size(egui::vec2(right_width, fill_height));
+                                        EmojiLabel::new(
+                                            egui::RichText::new("🌳 Manifest & Ingredients Tree")
+                                                .size(16.0),
+                                        )
+                                        .show(ui);
+                                        egui::ScrollArea::vertical()
+                                            .id_salt("tree_view")
+                                            .show(ui, |ui| {
+                                                display_manifest_ingredient_tree(
+                                                    ui,
+                                                    &manifest.manifest_value,
+                                                    &manifest.active_label,
+                                                );
+                                            });
+                                    },
+                                );
                             });
                         }
                     }
@@ -1094,85 +1172,4 @@ fn get_trust_status(manifest_value: &serde_json::Value, active_label: &str) -> O
         .get("trust")?
         .as_str()
         .map(|s| s.to_string())
-}
-
-/// Recursively display a JSON value as a tree
-fn display_json_tree(ui: &mut egui::Ui, value: &serde_json::Value, depth: usize) {
-    use serde_json::Value;
-
-    let indent = "  ".repeat(depth);
-
-    match value {
-        Value::Object(map) => {
-            for (key, val) in map {
-                match val {
-                    Value::Object(_) | Value::Array(_) => {
-                        egui::CollapsingHeader::new(format!("{}{}", indent, key))
-                            .default_open(depth < 2)
-                            .show(ui, |ui| {
-                                display_json_tree(ui, val, depth + 1);
-                            });
-                    }
-                    _ => {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{}{}: ", indent, key));
-                            display_json_value(ui, val);
-                        });
-                    }
-                }
-            }
-        }
-        Value::Array(arr) => {
-            for (idx, val) in arr.iter().enumerate() {
-                match val {
-                    Value::Object(_) | Value::Array(_) => {
-                        egui::CollapsingHeader::new(format!("{}[{}]", indent, idx))
-                            .default_open(depth < 2)
-                            .show(ui, |ui| {
-                                display_json_tree(ui, val, depth + 1);
-                            });
-                    }
-                    _ => {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{}[{}]: ", indent, idx));
-                            display_json_value(ui, val);
-                        });
-                    }
-                }
-            }
-        }
-        _ => {
-            display_json_value(ui, value);
-        }
-    }
-}
-
-/// Display a simple JSON value (not object or array) - using standard colors
-fn display_json_value(ui: &mut egui::Ui, value: &serde_json::Value) {
-    use serde_json::Value;
-
-    match value {
-        Value::String(s) => {
-            ui.label(
-                egui::RichText::new(format!("\"{}\"", s))
-                    .color(egui::Color32::from_rgb(206, 145, 120)),
-            );
-        }
-        Value::Number(n) => {
-            ui.label(
-                egui::RichText::new(n.to_string()).color(egui::Color32::from_rgb(181, 206, 168)),
-            );
-        }
-        Value::Bool(b) => {
-            ui.label(
-                egui::RichText::new(b.to_string()).color(egui::Color32::from_rgb(86, 156, 214)),
-            );
-        }
-        Value::Null => {
-            ui.label(egui::RichText::new("null").color(egui::Color32::from_rgb(86, 156, 214)));
-        }
-        _ => {
-            ui.label(value.to_string());
-        }
-    }
 }

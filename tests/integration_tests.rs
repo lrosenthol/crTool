@@ -2003,6 +2003,7 @@ fn test_testset_manifests() -> Result<()> {
         "p-actions-created",
         "p-actions-created-with-custom",
         "p-actions-created-with-icon",
+        "p-actions-created-filtered",
         "p-actions-opened-manifest",
         "p-actions-opened-manifest-invalid",
         "p-actions-opened-no-manifest",
