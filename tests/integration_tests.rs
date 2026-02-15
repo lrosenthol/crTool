@@ -19,7 +19,7 @@ mod common;
 use common::{
     get_test_images, has_asset_thumbnail, has_ingredient_thumbnails, manifests_dir, output_dir,
     sign_file_with_manifest, sign_file_with_manifest_and_ingredients,
-    sign_file_with_manifest_and_options, testfiles_dir, testset_dir, verify_signed_file,
+    sign_file_with_manifest_and_options, verify_signed_file,
 };
 
 /// Generate output filename from input filename and manifest type
@@ -38,8 +38,8 @@ fn generate_output_name(input: &Path, manifest_type: &str, subdir: Option<&str>)
     }
 }
 
-/// Generate output filename from manifest type & input extension
-/// Optionally specify a subdirectory within the output directory
+/// Generate output filename from manifest type & input extension (used by test_testset_manifests when jpeg_trust is enabled).
+#[cfg(feature = "jpeg_trust")]
 fn generate_output_name_no_stem(
     input: &Path,
     manifest_type: &str,
@@ -1977,8 +1977,9 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
     Ok(())
 }
 
-// Run the TestSet files
+/// Signs testset manifests and extracts with --jpt; requires JpegTrustReader. Skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_testset_manifests() -> Result<()> {
     use std::process::Command;
 
@@ -2029,7 +2030,7 @@ fn test_testset_manifests() -> Result<()> {
     let mut success_count = 0;
     let mut total_count = 0;
 
-    let input = testfiles_dir().join("Dog.jpg");
+    let input = common::testfiles_dir().join("Dog.jpg");
 
     // Clean the testset output directory before starting tests to ensure a fresh state.
     {
@@ -2051,7 +2052,7 @@ fn test_testset_manifests() -> Result<()> {
 
     // Process each manifest in the testset
     for manifest_name in &manifest_names {
-        let manifest_path = testset_dir().join(format!("{}.json", manifest_name));
+        let manifest_path = common::testset_dir().join(format!("{}.json", manifest_name));
         total_count += 1;
         // Use "testset" subdirectory to avoid conflicts with individual tests
         let output = generate_output_name_no_stem(&input, manifest_name, Some("testset"));

@@ -12,10 +12,14 @@ governing permissions and limitations under the License.
 
 //! # crTool Library
 //!
-//! Core library for extracting and validating C2PA manifests in JPEG Trust format.
+//! Core library for extracting and validating C2PA manifests in JPEG Trust and crJSON formats.
 
 use anyhow::{Context, Result};
+use c2pa::CrJsonReader;
+#[cfg(feature = "jpeg_trust")]
 use c2pa::JpegTrustReader;
+#[cfg(not(feature = "jpeg_trust"))]
+use c2pa::Reader;
 
 /// File extensions for asset types supported by c2pa-rs for reading/embedding C2PA manifests.
 /// Matches the formats listed in c2pa-rs [supported-formats](https://github.com/contentauth/c2pa-rs/blob/main/docs/supported-formats.md).
@@ -71,7 +75,10 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Extract a C2PA manifest from a file in JPEG Trust format
+/// Extract a C2PA manifest from a file in JPEG Trust format.
+///
+/// When the `jpeg_trust` feature is enabled and c2pa-rs exposes `JpegTrustReader`, this uses
+/// that for full JPT output (including asset hash). Otherwise it uses the standard `Reader`.
 ///
 /// # Arguments
 ///
@@ -79,7 +86,8 @@ pub struct ValidationError {
 ///
 /// # Returns
 ///
-/// A `ManifestExtractionResult` containing the extracted manifest data
+/// A `ManifestExtractionResult` containing the extracted manifest data.
+/// For crJSON format output, use [`extract_crjson_manifest`] instead.
 ///
 /// # Errors
 ///
@@ -87,6 +95,7 @@ pub struct ValidationError {
 /// - The file does not exist
 /// - The file does not contain a valid C2PA manifest
 /// - The manifest cannot be parsed
+#[cfg(feature = "jpeg_trust")]
 pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
     let input_path = input_path.as_ref();
 
@@ -94,25 +103,20 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
 
-    // Use JPEG Trust Reader
     let mut jpt_reader = JpegTrustReader::from_file(input_path).context(
         "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
     )?;
 
-    // Compute asset hash
     let asset_hash = jpt_reader.compute_asset_hash_from_file(input_path).ok();
 
-    // Get the active manifest label
     let active_label = jpt_reader
         .inner()
         .active_label()
         .context("No active C2PA manifest found in the input file")?
         .to_string();
 
-    // Get the manifest JSON
     let manifest_json = jpt_reader.json();
 
-    // Parse to serde_json::Value
     let manifest_value: serde_json::Value =
         serde_json::from_str(&manifest_json).context("Failed to parse extracted manifest JSON")?;
 
@@ -120,6 +124,86 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
         input_path: input_path.to_string_lossy().to_string(),
         active_label,
         asset_hash,
+        manifest_json,
+        manifest_value,
+    })
+}
+
+/// Fallback when `jpeg_trust` is not enabled: use standard Reader (no asset hash).
+#[cfg(not(feature = "jpeg_trust"))]
+pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
+    let input_path = input_path.as_ref();
+
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    let reader = Reader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = reader
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?
+        .to_string();
+
+    let manifest_json = reader.json();
+
+    let manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted manifest JSON")?;
+
+    Ok(ManifestExtractionResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        active_label,
+        asset_hash: None,
+        manifest_json,
+        manifest_value,
+    })
+}
+
+/// Extract a C2PA manifest from a file in crJSON format using the c2pa-rs CrJsonReader.
+///
+/// # Arguments
+///
+/// * `input_path` - Path to the input file containing a C2PA manifest
+///
+/// # Returns
+///
+/// A `ManifestExtractionResult` containing the extracted manifest data in crJSON format.
+/// `asset_hash` is not computed by CrJsonReader and will be `None`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The file does not exist
+/// - The file does not contain a valid C2PA manifest
+/// - The manifest cannot be parsed to crJSON
+pub fn extract_crjson_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
+    let input_path = input_path.as_ref();
+
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    let crjson_reader = CrJsonReader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = crjson_reader
+        .inner()
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?
+        .to_string();
+
+    let manifest_json = crjson_reader.json();
+
+    let manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted crJSON")?;
+
+    Ok(ManifestExtractionResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        active_label,
+        asset_hash: None,
         manifest_json,
         manifest_value,
     })

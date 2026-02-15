@@ -11,9 +11,9 @@ governing permissions and limitations under the License.
 */
 
 use anyhow::Result;
-use c2pa::{
-    Builder, CallbackSigner, Ingredient, JpegTrustReader, Reader, Relationship, SigningAlg,
-};
+#[cfg(feature = "jpeg_trust")]
+use c2pa::JpegTrustReader;
+use c2pa::{Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
 use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
@@ -561,26 +561,30 @@ fn extract_manifest_impl(input_path: &Path, output_path: &Path, use_jpt: bool) -
 
     // Get the manifest JSON based on format
     let manifest_json = if use_jpt {
-        let mut jpt_reader = JpegTrustReader::from_file(input_path)?;
-
-        // Compute asset hash for JPEG Trust format
-        let _ = jpt_reader.compute_asset_hash_from_file(input_path);
-
-        // Ensure there's an active manifest
-        let _active_label = jpt_reader
-            .inner()
-            .active_label()
-            .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
-
-        jpt_reader.json()
+        #[cfg(feature = "jpeg_trust")]
+        {
+            let mut jpt_reader = JpegTrustReader::from_file(input_path)?;
+            let _ = jpt_reader.compute_asset_hash_from_file(input_path);
+            let _active_label = jpt_reader
+                .inner()
+                .active_label()
+                .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+            jpt_reader.json()
+        }
+        #[cfg(not(feature = "jpeg_trust"))]
+        {
+            // Fallback when JpegTrustReader is not available from c2pa-rs
+            let reader = Reader::from_file(input_path)?;
+            let _active_label = reader
+                .active_label()
+                .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+            reader.json()
+        }
     } else {
         let reader = Reader::from_file(input_path)?;
-
-        // Ensure there's an active manifest
         let _active_label = reader
             .active_label()
             .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
-
         reader.json()
     };
 

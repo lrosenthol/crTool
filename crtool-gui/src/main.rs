@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 #![allow(unexpected_cfgs)]
 
 use crtool::{
-    default_schema_path, extract_jpt_manifest, validate_json_value, ManifestExtractionResult,
+    default_schema_path, extract_crjson_manifest, validate_json_value, ManifestExtractionResult,
     ValidationResult,
 };
 use eframe::egui;
@@ -136,7 +136,7 @@ impl CrtoolApp {
         if let Some(ref file_path) = self.selected_file {
             // On macOS, files opened via the system (drop-on-icon, Open With) require
             // security-scoped access before reading.
-            let extract = || extract_jpt_manifest(file_path).map_err(|e| e.to_string());
+            let extract = || extract_crjson_manifest(file_path).map_err(|e| e.to_string());
             let result = {
                 #[cfg(target_os = "macos")]
                 {
@@ -689,7 +689,7 @@ fn manifest_digital_source_type(manifest_obj: &serde_json::Value) -> Option<Stri
                 continue;
             }
             let url = act.get("digitalSourceType").and_then(|v| v.as_str())?;
-            return Some(url.split('/').filter(|s| !s.is_empty()).last()?.to_string());
+            return Some(url.split('/').rfind(|s| !s.is_empty())?.to_string());
         }
         None
     };

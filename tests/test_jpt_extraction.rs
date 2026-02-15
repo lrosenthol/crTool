@@ -100,7 +100,9 @@ fn test_extract_normal_format() -> Result<()> {
     Ok(())
 }
 
+/// Requires JpegTrustReader from c2pa-rs; skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_extract_jpt_format() -> Result<()> {
     // First, create a signed file
     let input = testfiles_dir().join("Dog.jpg");
@@ -273,7 +275,9 @@ fn test_extract_multiple_files_normal_format() -> Result<()> {
     Ok(())
 }
 
+/// Requires JpegTrustReader; skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_extract_multiple_files_jpt_format() -> Result<()> {
     // Create multiple signed files
     let manifest = manifests_dir().join("full_manifest.json");
@@ -340,7 +344,9 @@ fn test_extract_multiple_files_jpt_format() -> Result<()> {
 // Format Comparison Tests
 // ============================================================================
 
+/// Requires JpegTrustReader for JPT-specific format checks; skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_format_differences() -> Result<()> {
     // Create a signed file
     let input = testfiles_dir().join("Dog.jpg");
@@ -522,7 +528,9 @@ fn test_helper_extract_normal_format() -> Result<()> {
     Ok(())
 }
 
+/// Requires JpegTrustReader; skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_helper_extract_jpt_format() -> Result<()> {
     // Create a signed file
     let input = testfiles_dir().join("Dog.webp");
@@ -555,7 +563,9 @@ fn test_helper_extract_jpt_format() -> Result<()> {
 // Edge Cases and Integration Tests
 // ============================================================================
 
+/// Requires JpegTrustReader; skipped when feature "jpeg_trust" is not enabled.
 #[test]
+#[cfg(feature = "jpeg_trust")]
 fn test_jpt_with_complex_manifest() -> Result<()> {
     // Use a complex manifest with actions v2
     let input = testfiles_dir().join("Dog.jpg");
