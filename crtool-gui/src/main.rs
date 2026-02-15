@@ -895,7 +895,7 @@ fn display_manifest_ingredient_tree(
     )
     .default_open(true)
     .show(ui, |ui| {
-        // Root manifest details: claim type, claim generator, claim_generator_info, label, digital source type, trust (last)
+        // Root manifest details: claim type, claim generator, claim_generator_info, label, digital source type, trust
         let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(active_manifest);
         if let Some(ct) = claim_type {
             ui.label(
@@ -1095,7 +1095,7 @@ fn ingredient_node_details(
             );
         }
     }
-    // From nested manifest (if this ingredient is a C2PA asset): same field order as root — claim type, claim generator, claim generator info, digital source type, trust (last)
+    // From nested manifest (if this ingredient is a C2PA asset): same field order as root — claim type, claim generator, claim generator info, digital source type, trust
     if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ingredient) {
         let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(nested);
         if let Some(ct) = claim_type {
