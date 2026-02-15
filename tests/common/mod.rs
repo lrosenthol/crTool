@@ -13,7 +13,7 @@ governing permissions and limitations under the License.
 use anyhow::Result;
 #[cfg(feature = "jpeg_trust")]
 use c2pa::JpegTrustReader;
-use c2pa::{Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
+use c2pa::{Builder, CallbackSigner, CrJsonReader, Ingredient, Reader, Relationship, SigningAlg};
 use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
@@ -550,6 +550,23 @@ pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result
 #[allow(dead_code)]
 pub fn extract_manifest_to_file_jpt(input_path: &Path, output_path: &Path) -> Result<()> {
     extract_manifest_impl(input_path, output_path, true)
+}
+
+/// Helper function to extract manifest from a signed file in crJSON format (CrJsonReader).
+#[allow(dead_code)]
+pub fn extract_manifest_to_file_crjson(input_path: &Path, output_path: &Path) -> Result<()> {
+    if output_path.exists() {
+        fs::remove_file(output_path)?;
+    }
+    let crjson_reader = CrJsonReader::from_file(input_path)?;
+    let manifest_json = crjson_reader.json();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json_value: serde_json::Value = serde_json::from_str(&manifest_json)?;
+    let pretty_json = serde_json::to_string_pretty(&json_value)?;
+    fs::write(output_path, pretty_json)?;
+    Ok(())
 }
 
 /// Internal implementation for extracting manifests
