@@ -66,7 +66,7 @@ struct Cli {
     #[arg(long, default_value = "false")]
     jpt: bool,
 
-    /// Use crJSON format for extraction (only valid with --extract; mutually exclusive with --jpt)
+    /// Use crJSON format for extraction, or crJSON schema when validating (mutually exclusive with --jpt)
     #[arg(long, default_value = "false")]
     crjson: bool,
 
@@ -629,7 +629,10 @@ fn extract_manifest(input_path: &Path, output_path: &Path, format: ExtractFormat
             println!("  Active manifest label: {}", active_label);
 
             let json_str = crjson_reader.json();
-            serde_json::from_str(&json_str).context("Failed to parse crJSON")?
+            let mut value: JsonValue =
+                serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
+            crtool::normalize_crjson_validation_results(&mut value);
+            value
         }
         ExtractFormat::Default => {
             let reader = Reader::from_file(input_path).context(
@@ -785,23 +788,26 @@ fn process_single_file(
     Ok(())
 }
 
-/// Validate JSON files against the indicators schema
-fn validate_json_files(input_paths: &[PathBuf]) -> Result<()> {
-    println!("=== Validating JSON files against indicators schema ===\n");
-
-    // Load the schema from the crtool library's bundled path
-    let schema_path = crtool::default_schema_path();
+/// Validate JSON files against a schema (indicators or crJSON).
+fn validate_json_files(
+    input_paths: &[PathBuf],
+    schema_path: &Path,
+    schema_label: &str,
+) -> Result<()> {
+    println!(
+        "=== Validating JSON files against {} schema ===\n",
+        schema_label
+    );
 
     if !schema_path.exists() {
         anyhow::bail!("Schema file not found at: {:?}", schema_path);
     }
 
     println!("Loading schema from: {:?}\n", schema_path);
-    let schema_content =
-        fs::read_to_string(&schema_path).context("Failed to read indicators schema file")?;
+    let schema_content = fs::read_to_string(schema_path).context("Failed to read schema file")?;
 
     let schema_json: JsonValue =
-        serde_json::from_str(&schema_content).context("Failed to parse indicators schema JSON")?;
+        serde_json::from_str(&schema_content).context("Failed to parse schema JSON")?;
 
     // Compile the schema
     let compiled_schema = jsonschema::validator_for(&schema_json)
@@ -927,8 +933,14 @@ fn main() -> Result<()> {
 
     // Handle validation mode
     if cli.validate {
-        // In validation mode, input files should be JSON files to validate
-        return validate_json_files(&input_files);
+        // In validation mode, input files should be JSON files to validate.
+        // Use crJSON schema when --crjson is set, otherwise indicators schema.
+        let (schema_path, schema_label) = if cli.crjson {
+            (crtool::crjson_schema_path(), "crJSON")
+        } else {
+            (crtool::default_schema_path(), "indicators")
+        };
+        return validate_json_files(&input_files, &schema_path, schema_label);
     }
 
     // Handle extract mode
@@ -991,7 +1003,7 @@ fn main() -> Result<()> {
         anyhow::bail!("--jpt can only be used with --extract mode");
     }
     if cli.crjson {
-        anyhow::bail!("--crjson can only be used with --extract mode");
+        anyhow::bail!("--crjson can only be used with --extract or --validate mode");
     }
 
     // Normal signing mode - validate required arguments
@@ -1132,7 +1144,8 @@ mod tests {
             .join("simple_manifest.json");
 
         if manifest_path.exists() {
-            let result = validate_json_files(&[manifest_path]);
+            let schema_path = crtool::default_schema_path();
+            let result = validate_json_files(&[manifest_path.clone()], &schema_path, "indicators");
             // Note: This will fail since simple_manifest.json doesn't conform to indicators schema
             // That's expected - it's a C2PA manifest template, not an indicators document
             assert!(result.is_err());
@@ -1150,7 +1163,9 @@ mod tests {
         writeln!(file, "{{ invalid json }}").expect("Failed to write temp file");
         drop(file);
 
-        let result = validate_json_files(std::slice::from_ref(&temp_file));
+        let schema_path = crtool::default_schema_path();
+        let result =
+            validate_json_files(std::slice::from_ref(&temp_file), &schema_path, "indicators");
         assert!(result.is_err());
 
         // Clean up
@@ -1160,7 +1175,8 @@ mod tests {
     #[test]
     fn test_validate_json_files_with_nonexistent_file() {
         let nonexistent = PathBuf::from("/nonexistent/file.json");
-        let result = validate_json_files(&[nonexistent]);
+        let schema_path = crtool::default_schema_path();
+        let result = validate_json_files(&[nonexistent], &schema_path, "indicators");
         assert!(result.is_err());
     }
 }

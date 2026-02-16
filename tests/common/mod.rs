@@ -563,7 +563,8 @@ pub fn extract_manifest_to_file_crjson(input_path: &Path, output_path: &Path) ->
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let json_value: serde_json::Value = serde_json::from_str(&manifest_json)?;
+    let mut json_value: serde_json::Value = serde_json::from_str(&manifest_json)?;
+    crtool::normalize_crjson_validation_results(&mut json_value);
     let pretty_json = serde_json::to_string_pretty(&json_value)?;
     fs::write(output_path, pretty_json)?;
     Ok(())

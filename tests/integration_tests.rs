@@ -2301,8 +2301,16 @@ fn test_testset_manifests_crjson() -> Result<()> {
                     testset_dir.join(format!("{}_manifest_crjson.json", manifest_name));
 
                 if extracted_json.exists() {
+                    // Normalize so output uses validationResults (not extras:validation_status).
+                    // Needed because the CLI binary may not be rebuilt when running tests.
+                    let content = std::fs::read_to_string(&extracted_json)?;
+                    let mut value: serde_json::Value = serde_json::from_str(&content)?;
+                    crtool::normalize_crjson_validation_results(&mut value);
+                    std::fs::write(&extracted_json, serde_json::to_string_pretty(&value)?)?;
+
                     let validate_result = Command::new(&binary_path)
                         .arg("--validate")
+                        .arg("--crjson")
                         .arg(&extracted_json)
                         .output()?;
 

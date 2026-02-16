@@ -40,6 +40,19 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+/// Normalizes crJSON so validation data is under `validationResults` instead of the legacy
+/// `extras:validation_status` key. If the value is an object containing `extras:validation_status`,
+/// it is moved to `validationResults` and the old key is removed. Idempotent if already normalized.
+pub fn normalize_crjson_validation_results(value: &mut serde_json::Value) {
+    let obj = match value.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+    if let Some(legacy) = obj.remove("extras:validation_status") {
+        obj.insert("validationResults".to_string(), legacy);
+    }
+}
+
 /// Result of extracting a manifest from a file
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifestExtractionResult {
@@ -197,8 +210,13 @@ pub fn extract_crjson_manifest<P: AsRef<Path>>(input_path: P) -> Result<Manifest
 
     let manifest_json = crjson_reader.json();
 
-    let manifest_value: serde_json::Value =
+    let mut manifest_value: serde_json::Value =
         serde_json::from_str(&manifest_json).context("Failed to parse extracted crJSON")?;
+
+    normalize_crjson_validation_results(&mut manifest_value);
+
+    let manifest_json = serde_json::to_string_pretty(&manifest_value)
+        .context("Failed to re-serialize crJSON after normalization")?;
 
     Ok(ManifestExtractionResult {
         input_path: input_path.to_string_lossy().to_string(),
@@ -296,12 +314,22 @@ pub fn validate_json_file<P: AsRef<Path>>(
 
 /// Get the default schema path relative to the crate root
 ///
-/// This returns the path to the bundled indicators schema.
+/// This returns the path to the bundled JPEG Trust indicators schema.
 pub fn default_schema_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("INTERNAL")
         .join("schemas")
         .join("indicators-schema.json")
+}
+
+/// Get the crJSON schema path relative to the crate root
+///
+/// Use this when validating crJSON documents (e.g. output of `--extract --crjson`).
+pub fn crjson_schema_path() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("INTERNAL")
+        .join("schemas")
+        .join("crJSON-schema.json")
 }
 
 /// Converts dashed JUMBF identifier to proper URI form (with '/').
@@ -381,6 +409,16 @@ mod tests {
         assert!(
             schema_path.exists(),
             "Default schema path should exist: {:?}",
+            schema_path
+        );
+    }
+
+    #[test]
+    fn test_crjson_schema_path_exists() {
+        let schema_path = crjson_schema_path();
+        assert!(
+            schema_path.exists(),
+            "crJSON schema path should exist: {:?}",
             schema_path
         );
     }
