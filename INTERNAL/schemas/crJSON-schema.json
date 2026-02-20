@@ -41,7 +41,7 @@
             }
         },
         "validationResults": {
-            "description": "Validation results from validation_results() (active manifest and ingredient deltas)",
+            "description": "Validation results from validation (active manifest and ingredient deltas)",
             "$ref": "#/definitions/validationResults"
         }
     },
@@ -74,7 +74,7 @@
                 },
                 "assertions": {
                     "type": "object",
-                    "description": "Assertions contained within the manifest, keyed by assertion type or identifier",
+                    "description": "Assertions contained within the manifest, keyed by the assertion's label",
                     "additionalProperties": true
                 },
                 "claim": {
@@ -417,12 +417,19 @@
                     "type": "string",
                     "description": "Version of the software"
                 },
-                "schema.org.SoftwareApplication.operatingSystem": {
+                "icon": {
+                    "$ref": "#/definitions/hashedUriMap",
+                    "description": "Icon representing the software/hardware"
+                },
+                "operating_system": {
                     "type": "string",
                     "description": "Operating system the software runs on"
                 }
             },
-            "additionalProperties": false
+            "required": [
+                "name"
+            ],
+            "additionalProperties": true
         },
         "signature": {
             "type": "object",
@@ -801,6 +808,9 @@
                     }
                 }
             },
+            "required": [
+                "activeManifest"
+            ],
             "additionalProperties": false
         },
         "statusCodes": {
@@ -826,6 +836,11 @@
                     }
                 }
             },
+            "required": [
+                "success",
+                "informational",
+                "failure"
+            ],
             "additionalProperties": false
         },
         "validationStatusEntry": {
@@ -855,7 +870,8 @@
             "description": "Validation deltas for one ingredient's manifest",
             "properties": {
                 "ingredientAssertionURI": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "JUMBF URI to the ingredient assertion"
                 },
                 "validationDeltas": {
                     "$ref": "#/definitions/statusCodes"

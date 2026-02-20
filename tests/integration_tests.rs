@@ -2191,11 +2191,9 @@ fn test_testset_manifests() -> Result<()> {
     Ok(())
 }
 
-/// Signs testset manifests and extracts with --crjson (CrJsonReader). Always runs (no feature gate).
+/// Signs testset manifests and extracts crJSON via library (CrJsonReader), then validates with crJSON schema. No CLI dependency.
 #[test]
 fn test_testset_manifests_crjson() -> Result<()> {
-    use std::process::Command;
-
     let manifest_names = vec![
         "n-actions-created-gathered",
         "n-actions-inception",
@@ -2281,17 +2279,9 @@ fn test_testset_manifests_crjson() -> Result<()> {
             }
         }
 
-        {
-            let binary_path = common::cli_binary_path();
-            let result = Command::new(&binary_path)
-                .arg("--extract")
-                .arg("--crjson")
-                .arg(&output)
-                .arg("--output")
-                .arg(&testset_dir)
-                .output()?;
-
-            if result.status.success() {
+        // Extract crJSON using library (no CLI)
+        match crtool::extract_crjson_manifest(&output) {
+            Ok(extraction) => {
                 println!(
                     "✓ crJSON extraction of manifest from {:?}",
                     output.file_name().unwrap().to_str().unwrap(),
@@ -2299,76 +2289,69 @@ fn test_testset_manifests_crjson() -> Result<()> {
 
                 let extracted_json =
                     testset_dir.join(format!("{}_manifest_crjson.json", manifest_name));
+                std::fs::write(&extracted_json, &extraction.manifest_json)?;
 
-                if extracted_json.exists() {
-                    // Normalize so output uses validationResults (not extras:validation_status).
-                    // Needed because the CLI binary may not be rebuilt when running tests.
-                    let content = std::fs::read_to_string(&extracted_json)?;
-                    let mut value: serde_json::Value = serde_json::from_str(&content)?;
-                    crtool::normalize_crjson_validation_results(&mut value);
-                    std::fs::write(&extracted_json, serde_json::to_string_pretty(&value)?)?;
+                let schema_path = crtool::crjson_schema_path();
+                let validation = crtool::validate_json_file(&extracted_json, &schema_path)?;
 
-                    let validate_result = Command::new(&binary_path)
-                        .arg("--validate")
-                        .arg("--crjson")
-                        .arg(&extracted_json)
-                        .output()?;
+                if validation.is_valid {
+                    println!(
+                        "✓ Validation passed for extracted crJSON: {}",
+                        extracted_json.file_name().unwrap().to_str().unwrap()
+                    );
+                } else {
+                    let err_msgs: Vec<String> = validation
+                        .errors
+                        .iter()
+                        .map(|e| format!("{}: {}", e.instance_path, e.message))
+                        .collect();
+                    println!(
+                        "✗ Validation failed for {:?}: {}",
+                        extracted_json,
+                        err_msgs.join("; ")
+                    );
+                    anyhow::bail!(
+                        "crJSON validation failed for {}: {}",
+                        extracted_json.file_name().unwrap().to_str().unwrap(),
+                        err_msgs.join("; ")
+                    );
+                }
 
-                    if validate_result.status.success() {
-                        println!(
-                            "✓ Validation passed for extracted crJSON: {}",
-                            extracted_json.file_name().unwrap().to_str().unwrap()
-                        );
-                    } else {
-                        println!(
-                            "✗ Validation failed for {:?}: {}",
-                            extracted_json,
-                            String::from_utf8_lossy(&validate_result.stderr)
-                        );
-                    }
-
-                    if *manifest_name == "p-actions-created-with-icon" {
-                        let content = std::fs::read_to_string(&extracted_json)?;
-                        let j: serde_json::Value = serde_json::from_str(&content)?;
-                        let manifests = j
-                            .get("manifests")
-                            .and_then(|m| m.as_array())
-                            .expect("crJSON should have manifests array");
-                        let manifest = manifests
-                            .first()
-                            .expect("should have at least one manifest");
-                        let claim_v2 = manifest
-                            .get("claim.v2")
-                            .expect("manifest should have claim.v2");
-                        if let Some(cgi) = claim_v2
-                            .get("claim_generator_info")
-                            .and_then(|c| c.as_array())
-                            .and_then(|a| a.first())
+                if *manifest_name == "p-actions-created-with-icon" {
+                    let j = &extraction.manifest_value;
+                    let manifests = j
+                        .get("manifests")
+                        .and_then(|m| m.as_array())
+                        .expect("crJSON should have manifests array");
+                    let manifest = manifests
+                        .first()
+                        .expect("should have at least one manifest");
+                    let claim_v2 = manifest
+                        .get("claim.v2")
+                        .expect("manifest should have claim.v2");
+                    if let Some(cgi) = claim_v2
+                        .get("claim_generator_info")
+                        .and_then(|c| c.as_array())
+                        .and_then(|a| a.first())
+                    {
+                        if let Some(icon_id) = cgi
+                            .get("icon")
+                            .and_then(|i| i.get("identifier"))
+                            .and_then(|s| s.as_str())
                         {
-                            if let Some(icon_id) = cgi
-                                .get("icon")
-                                .and_then(|i| i.get("identifier"))
-                                .and_then(|s| s.as_str())
-                            {
-                                assert!(
-                                    icon_id.contains("jumbf")
-                                        && (icon_id.contains('/') || icon_id.contains("c2pa")),
-                                    "icon identifier should be a proper URI, got: {}",
-                                    icon_id
-                                );
-                                println!("  ✓ Icon manifest: icon identifier present in crJSON");
-                            }
+                            assert!(
+                                icon_id.contains("jumbf")
+                                    && (icon_id.contains('/') || icon_id.contains("c2pa")),
+                                "icon identifier should be a proper URI, got: {}",
+                                icon_id
+                            );
+                            println!("  ✓ Icon manifest: icon identifier present in crJSON");
                         }
                     }
-                } else {
-                    println!("⚠ Extracted crJSON file not found: {:?}", extracted_json);
                 }
-            } else {
-                println!(
-                    "✗ crJSON extraction failed for {:?}: {}",
-                    output,
-                    String::from_utf8_lossy(&result.stderr)
-                );
+            }
+            Err(e) => {
+                println!("✗ crJSON extraction failed for {:?}: {}", output, e);
             }
         }
     }

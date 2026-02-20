@@ -40,16 +40,91 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-/// Normalizes crJSON so validation data is under `validationResults` instead of the legacy
-/// `extras:validation_status` key. If the value is an object containing `extras:validation_status`,
-/// it is moved to `validationResults` and the old key is removed. Idempotent if already normalized.
+/// Builds a `validationResults` value that conforms to the crJSON schema: `activeManifest`
+/// (required) with `success`, `informational`, `failure` arrays; optional `ingredientDeltas`.
+fn validation_results_to_schema_shape(input: &serde_json::Value) -> serde_json::Value {
+    let empty_status = serde_json::json!({
+        "success": [],
+        "informational": [],
+        "failure": []
+    });
+
+    let active_manifest = if let Some(obj) = input.as_object() {
+        if let Some(am) = obj.get("activeManifest").and_then(|v| v.as_object()) {
+            let success = am
+                .get("success")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let informational = am
+                .get("informational")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let failure = am
+                .get("failure")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            serde_json::json!({
+                "success": success,
+                "informational": informational,
+                "failure": failure
+            })
+        } else if obj.get("isValid").is_some() || obj.get("error").is_some() {
+            // Legacy validationStatus: { isValid, error?, code?, explanation?, uri? }
+            let code = obj
+                .get("code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("validation.legacy");
+            let explanation = obj.get("explanation").and_then(|v| v.as_str());
+            let url = obj.get("uri").and_then(|v| v.as_str());
+            let entry = serde_json::json!({
+                "code": code,
+                "url": url,
+                "explanation": explanation
+            });
+            let (success, failure) = match obj.get("isValid").and_then(|v| v.as_bool()) {
+                Some(true) => (vec![entry], vec![]),
+                Some(false) => (vec![], vec![entry]),
+                None => (vec![], vec![entry]),
+            };
+            serde_json::json!({
+                "success": success,
+                "informational": [],
+                "failure": failure
+            })
+        } else {
+            empty_status
+        }
+    } else {
+        empty_status.clone()
+    };
+
+    let ingredient_deltas = input
+        .get("ingredientDeltas")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "activeManifest": active_manifest,
+        "ingredientDeltas": ingredient_deltas
+    })
+}
+
+/// Normalizes crJSON so validation data is under `validationResults` in the shape required by
+/// the crJSON schema. Only legacy `extras:validation_status` is moved and converted;
+/// if the document already has `validationResults` (e.g. from c2pa-rs), it is left unchanged.
+/// Idempotent when already normalized or when c2pa-rs already emitted validationResults.
 pub fn normalize_crjson_validation_results(value: &mut serde_json::Value) {
     let obj = match value.as_object_mut() {
         Some(o) => o,
         None => return,
     };
     if let Some(legacy) = obj.remove("extras:validation_status") {
-        obj.insert("validationResults".to_string(), legacy);
+        let conformant = validation_results_to_schema_shape(&legacy);
+        obj.insert("validationResults".to_string(), conformant);
     }
 }
 
