@@ -1,0 +1,445 @@
+/*
+Copyright 2025 Adobe. All rights reserved.
+This file is licensed to you under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License. You may obtain a copy
+of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under
+the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+OF ANY KIND, either express or implied. See the License for the specific language
+governing permissions and limitations under the License.
+*/
+
+//! crJSON extraction tests (CLI --crjson and CrJsonReader helper).
+//! Mirrors the structure of test_jpt_extraction.rs for JPEG Trust format.
+
+use anyhow::Result;
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+
+mod common;
+
+use common::{certs_dir, manifests_dir, output_dir, sign_file_with_manifest, testfiles_dir};
+
+fn generate_extraction_output_crjson(input: &str, subdir: &str) -> PathBuf {
+    let dir = output_dir().join(subdir);
+    fs::create_dir_all(&dir).expect("Failed to create subdirectory");
+    dir.join(
+        input
+            .trim_end_matches(".jpg")
+            .trim_end_matches(".png")
+            .trim_end_matches(".webp")
+            .to_string()
+            + "_manifest_crjson.json",
+    )
+}
+
+fn get_binary_path() -> std::path::PathBuf {
+    common::cli_binary_path()
+}
+
+// ============================================================================
+// Basic crJSON Extraction Tests
+// ============================================================================
+
+#[test]
+fn test_extract_crjson_format() -> Result<()> {
+    let input = testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let signed_output = output_dir().join("crjson_tests/test_crjson_signed.jpg");
+
+    fs::create_dir_all(signed_output.parent().unwrap())?;
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    let extract_output = generate_extraction_output_crjson("test_crjson_signed", "crjson_tests");
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&signed_output)
+        .arg("--output")
+        .arg(&extract_output)
+        .output()?;
+
+    assert!(
+        result.status.success(),
+        "Extraction failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert!(extract_output.exists(), "Output file should exist");
+
+    let json_content = fs::read_to_string(&extract_output)?;
+    let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    assert!(json_value.is_object(), "JSON should be an object");
+
+    assert!(
+        json_value.get("@context").is_some(),
+        "crJSON format should have @context field"
+    );
+    if let Some(context) = json_value.get("@context") {
+        let context_str = context.to_string();
+        assert!(
+            context_str.contains("contentcredentials.org/crjson"),
+            "@context should reference crJSON vocabulary"
+        );
+    }
+
+    assert!(
+        json_value
+            .get("manifests")
+            .and_then(|m| m.as_array())
+            .is_some(),
+        "crJSON format should have manifests as array"
+    );
+
+    println!("✓ crJSON format extraction test passed");
+    Ok(())
+}
+
+#[test]
+fn test_crjson_without_extract_fails() -> Result<()> {
+    let input = testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let cert = certs_dir().join("ed25519.pub");
+    let key = certs_dir().join("ed25519.pem");
+    let output = output_dir().join("crjson_tests/should_fail_crjson.jpg");
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg(&input)
+        .arg("--output")
+        .arg(&output)
+        .arg("--cert")
+        .arg(&cert)
+        .arg("--key")
+        .arg(&key)
+        .arg("--crjson")
+        .arg("--allow-self-signed")
+        .output()?;
+
+    assert!(
+        !result.status.success(),
+        "--crjson without --extract should fail. stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("--crjson") && stderr.contains("extract"),
+        "Error message should mention --crjson and extract requirement. Got: {}",
+        stderr
+    );
+
+    println!("✓ --crjson without --extract correctly fails");
+    Ok(())
+}
+
+// ============================================================================
+// Multiple File Extraction Tests
+// ============================================================================
+
+#[test]
+fn test_extract_multiple_files_crjson_format() -> Result<()> {
+    let manifest = manifests_dir().join("full_manifest.json");
+    let extract_dir = output_dir().join("crjson_tests/multi_extract_crjson");
+    fs::create_dir_all(&extract_dir)?;
+
+    let inputs = vec![
+        ("Dog.jpg", testfiles_dir().join("Dog.jpg")),
+        ("Dog.webp", testfiles_dir().join("Dog.webp")),
+    ];
+
+    let mut signed_files = Vec::new();
+    for (name, input) in &inputs {
+        let signed = output_dir().join(format!("crjson_tests/multi_crjson_{}", name));
+        sign_file_with_manifest(input, &signed, &manifest)?;
+        signed_files.push(signed);
+    }
+
+    let binary = get_binary_path();
+    let mut cmd = Command::new(binary);
+    cmd.arg("--extract").arg("--crjson");
+
+    for signed in &signed_files {
+        cmd.arg(signed);
+    }
+
+    cmd.arg("--output").arg(&extract_dir);
+
+    let result = cmd.output()?;
+
+    assert!(
+        result.status.success(),
+        "Multi-file crJSON extraction failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    for signed in &signed_files {
+        let filename = signed.file_stem().unwrap().to_str().unwrap();
+        let expected_output = extract_dir.join(format!("{}_manifest_crjson.json", filename));
+        assert!(
+            expected_output.exists(),
+            "crJSON output file should exist: {:?}",
+            expected_output
+        );
+
+        let json_content = fs::read_to_string(&expected_output)?;
+        let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+        assert!(
+            json_value.get("@context").is_some(),
+            "Should have @context in crJSON format"
+        );
+    }
+
+    println!("✓ Multiple file crJSON format extraction test passed");
+    Ok(())
+}
+
+// ============================================================================
+// Format Comparison Tests
+// ============================================================================
+
+#[test]
+fn test_format_differences_crjson() -> Result<()> {
+    let input = testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("full_manifest.json");
+    let signed_output = output_dir().join("crjson_tests/compare_crjson_signed.jpg");
+
+    fs::create_dir_all(signed_output.parent().unwrap())?;
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    let normal_output = output_dir().join("crjson_tests/compare_crjson_normal_manifest.json");
+    let crjson_output = generate_extraction_output_crjson("compare_crjson", "crjson_tests");
+
+    fs::create_dir_all(crjson_output.parent().unwrap())?;
+
+    let binary = get_binary_path();
+
+    let result1 = Command::new(&binary)
+        .arg("--extract")
+        .arg(&signed_output)
+        .arg("--output")
+        .arg(&normal_output)
+        .output()?;
+
+    assert!(result1.status.success(), "Normal extraction should succeed");
+
+    let result2 = Command::new(&binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&signed_output)
+        .arg("--output")
+        .arg(&crjson_output)
+        .output()?;
+
+    assert!(result2.status.success(), "crJSON extraction should succeed");
+
+    let normal_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&normal_output)?)?;
+    let crjson_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&crjson_output)?)?;
+
+    assert!(
+        crjson_json.get("@context").is_some(),
+        "crJSON should have @context"
+    );
+    assert!(
+        normal_json.get("@context").is_none(),
+        "Normal format should not have @context"
+    );
+
+    let crjson_manifests = crjson_json.get("manifests").unwrap();
+    let normal_manifests = normal_json.get("manifests").unwrap();
+
+    assert!(
+        crjson_manifests.is_array(),
+        "crJSON manifests should be an array"
+    );
+    assert!(
+        normal_manifests.is_object(),
+        "Normal manifests should be an object"
+    );
+
+    assert!(
+        !crjson_manifests.as_array().unwrap().is_empty(),
+        "crJSON should have at least one manifest"
+    );
+    assert!(
+        !normal_manifests.as_object().unwrap().is_empty(),
+        "Normal should have at least one manifest"
+    );
+
+    println!("✓ Format differences (normal vs crJSON) test passed");
+    Ok(())
+}
+
+// ============================================================================
+// Error Handling Tests
+// ============================================================================
+
+#[test]
+fn test_extract_file_without_manifest_crjson() -> Result<()> {
+    let input = testfiles_dir().join("Dog.jpg");
+    let extract_output = output_dir().join("crjson_tests/no_manifest_crjson.json");
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&input)
+        .arg("--output")
+        .arg(&extract_output)
+        .output()?;
+
+    assert!(
+        !result.status.success(),
+        "crJSON extraction from unsigned file should fail"
+    );
+
+    println!("✓ crJSON extraction from unsigned file correctly fails");
+    Ok(())
+}
+
+#[test]
+fn test_extract_nonexistent_file_crjson() -> Result<()> {
+    let input = testfiles_dir().join("NonExistent.jpg");
+    let extract_output = output_dir().join("crjson_tests/nonexistent_crjson.json");
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&input)
+        .arg("--output")
+        .arg(&extract_output)
+        .output()?;
+
+    assert!(
+        !result.status.success(),
+        "Extraction from nonexistent file should fail"
+    );
+
+    println!("✓ crJSON extraction from nonexistent file correctly fails");
+    Ok(())
+}
+
+// ============================================================================
+// Programmatic API Tests (helper function)
+// ============================================================================
+
+#[test]
+fn test_helper_extract_crjson_format() -> Result<()> {
+    let input = testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("full_manifest.json");
+    let signed_output = output_dir().join("crjson_tests/helper_crjson_signed.webp");
+
+    fs::create_dir_all(signed_output.parent().unwrap())?;
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    let extract_output = output_dir().join("crjson_tests/helper_crjson_extracted.json");
+    common::extract_manifest_to_file_crjson(&signed_output, &extract_output)?;
+
+    assert!(extract_output.exists(), "Output should exist");
+    let json_content = fs::read_to_string(&extract_output)?;
+    let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    assert!(json_value.is_object(), "Should be valid JSON");
+    assert!(
+        json_value.get("@context").is_some(),
+        "crJSON format should have @context"
+    );
+
+    println!("✓ Helper function for crJSON format works");
+    Ok(())
+}
+
+// ============================================================================
+// Edge Cases and Integration Tests
+// ============================================================================
+
+#[test]
+fn test_crjson_with_complex_manifest() -> Result<()> {
+    let input = testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("actions_v2_filtered_manifest.json");
+    let signed_output = output_dir().join("crjson_tests/complex_crjson_signed.jpg");
+
+    fs::create_dir_all(signed_output.parent().unwrap())?;
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    let extract_output = output_dir().join("crjson_tests/complex_crjson.json");
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&signed_output)
+        .arg("--output")
+        .arg(&extract_output)
+        .output()?;
+
+    assert!(
+        result.status.success(),
+        "Complex manifest crJSON extraction should succeed"
+    );
+
+    let json_content = fs::read_to_string(&extract_output)?;
+    let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    assert!(json_value.get("@context").is_some());
+
+    if let Some(manifests) = json_value.get("manifests").and_then(|m| m.as_array()) {
+        assert!(!manifests.is_empty(), "Should have manifests");
+
+        if let Some(manifest_obj) = manifests.first() {
+            if let Some(assertions) = manifest_obj.get("assertions") {
+                assert!(
+                    assertions.is_object() || assertions.is_array(),
+                    "Assertions should be present"
+                );
+            }
+        }
+    }
+
+    println!("✓ crJSON extraction with complex manifest works");
+    Ok(())
+}
+
+#[test]
+fn test_crjson_output_to_directory() -> Result<()> {
+    let input = testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let signed_output = output_dir().join("crjson_tests/dir_crjson_signed.png");
+
+    fs::create_dir_all(signed_output.parent().unwrap())?;
+    sign_file_with_manifest(&input, &signed_output, &manifest)?;
+
+    let extract_dir = output_dir().join("crjson_tests/dir_crjson_extract");
+    fs::create_dir_all(&extract_dir)?;
+
+    let binary = get_binary_path();
+    let result = Command::new(binary)
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&signed_output)
+        .arg("--output")
+        .arg(&extract_dir)
+        .output()?;
+
+    assert!(result.status.success(), "Directory output should work");
+
+    let expected_file = extract_dir.join("dir_crjson_signed_manifest_crjson.json");
+    assert!(
+        expected_file.exists(),
+        "Should create file with _manifest_crjson.json suffix"
+    );
+
+    println!("✓ crJSON extraction to directory works");
+    Ok(())
+}

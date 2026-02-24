@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 #![allow(unexpected_cfgs)]
 
 use crtool::{
-    default_schema_path, extract_jpt_manifest, validate_json_value, ManifestExtractionResult,
+    default_schema_path, extract_crjson_manifest, validate_json_value, ManifestExtractionResult,
     ValidationResult,
 };
 use eframe::egui;
@@ -136,7 +136,7 @@ impl CrtoolApp {
         if let Some(ref file_path) = self.selected_file {
             // On macOS, files opened via the system (drop-on-icon, Open With) require
             // security-scoped access before reading.
-            let extract = || extract_jpt_manifest(file_path).map_err(|e| e.to_string());
+            let extract = || extract_crjson_manifest(file_path).map_err(|e| e.to_string());
             let result = {
                 #[cfg(target_os = "macos")]
                 {
@@ -689,7 +689,7 @@ fn manifest_digital_source_type(manifest_obj: &serde_json::Value) -> Option<Stri
                 continue;
             }
             let url = act.get("digitalSourceType").and_then(|v| v.as_str())?;
-            return Some(url.split('/').filter(|s| !s.is_empty()).last()?.to_string());
+            return Some(url.split('/').rfind(|s| !s.is_empty())?.to_string());
         }
         None
     };
@@ -895,7 +895,7 @@ fn display_manifest_ingredient_tree(
     )
     .default_open(true)
     .show(ui, |ui| {
-        // Root manifest details: claim type, claim generator, claim_generator_info, label
+        // Root manifest details: claim type, claim generator, claim_generator_info, label, digital source type, trust
         let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(active_manifest);
         if let Some(ct) = claim_type {
             ui.label(
@@ -925,19 +925,6 @@ fn display_manifest_ingredient_tree(
                     .color(egui::Color32::from_rgb(128, 128, 128)),
             );
         }
-        if let Some(trust) = trust_status_from_manifest(active_manifest) {
-            let (icon, color) = match trust.as_str() {
-                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
-                "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
-                _ => ("", egui::Color32::from_rgb(128, 128, 128)),
-            };
-            let text = if icon.is_empty() {
-                format!("Trust: {}", trust)
-            } else {
-                format!("Trust: {} {}", icon, trust)
-            };
-            ui.label(egui::RichText::new(text).size(12.0).color(color));
-        }
         let ingredients = collect_ingredients_from_manifest(active_manifest);
         if let Some(dst) = manifest_digital_source_type(active_manifest) {
             ui.label(
@@ -961,6 +948,19 @@ fn display_manifest_ingredient_tree(
                     }
                 }
             }
+        }
+        if let Some(trust) = trust_status_from_manifest(active_manifest) {
+            let (icon, color) = match trust.as_str() {
+                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
+                "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
+                _ => ("", egui::Color32::from_rgb(128, 128, 128)),
+            };
+            let text = if icon.is_empty() {
+                format!("Trust: {}", trust)
+            } else {
+                format!("Trust: {} {}", icon, trust)
+            };
+            ui.label(egui::RichText::new(text).size(12.0).color(color));
         }
         ui.add_space(4.0);
         if ingredients.is_empty() {
@@ -1095,15 +1095,8 @@ fn ingredient_node_details(
             );
         }
     }
-    // Claim generator / claim type / digital source type from nested manifest (if this ingredient is a C2PA asset)
+    // From nested manifest (if this ingredient is a C2PA asset): same field order as root — claim type, claim generator, claim generator info, digital source type, trust
     if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ingredient) {
-        if let Some(dst) = manifest_digital_source_type(nested) {
-            ui.label(
-                egui::RichText::new(format!("Digital source type: {}", dst))
-                    .size(small)
-                    .color(gray),
-            );
-        }
         let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(nested);
         if let Some(ct) = claim_type {
             ui.label(
@@ -1126,7 +1119,13 @@ fn ingredient_node_details(
                     .color(gray),
             );
         }
-        // Trust status for ingredient (from nested manifest)
+        if let Some(dst) = manifest_digital_source_type(nested) {
+            ui.label(
+                egui::RichText::new(format!("Digital source type: {}", dst))
+                    .size(small)
+                    .color(gray),
+            );
+        }
         if let Some(trust) = trust_status_from_manifest(nested) {
             let (icon, color) = match trust.as_str() {
                 "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
