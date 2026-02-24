@@ -12,10 +12,14 @@ governing permissions and limitations under the License.
 
 //! # crTool Library
 //!
-//! Core library for extracting and validating C2PA manifests in JPEG Trust format.
+//! Core library for extracting and validating C2PA manifests in JPEG Trust and crJSON formats.
 
 use anyhow::{Context, Result};
+use c2pa::CrJsonReader;
+#[cfg(feature = "jpeg_trust")]
 use c2pa::JpegTrustReader;
+#[cfg(not(feature = "jpeg_trust"))]
+use c2pa::Reader;
 
 /// File extensions for asset types supported by c2pa-rs for reading/embedding C2PA manifests.
 /// Matches the formats listed in c2pa-rs [supported-formats](https://github.com/contentauth/c2pa-rs/blob/main/docs/supported-formats.md).
@@ -35,6 +39,94 @@ pub fn is_supported_asset_path<P: AsRef<Path>>(path: P) -> bool {
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+
+/// Builds a `validationResults` value that conforms to the crJSON schema: `activeManifest`
+/// (required) with `success`, `informational`, `failure` arrays; optional `ingredientDeltas`.
+fn validation_results_to_schema_shape(input: &serde_json::Value) -> serde_json::Value {
+    let empty_status = serde_json::json!({
+        "success": [],
+        "informational": [],
+        "failure": []
+    });
+
+    let active_manifest = if let Some(obj) = input.as_object() {
+        if let Some(am) = obj.get("activeManifest").and_then(|v| v.as_object()) {
+            let success = am
+                .get("success")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let informational = am
+                .get("informational")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let failure = am
+                .get("failure")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            serde_json::json!({
+                "success": success,
+                "informational": informational,
+                "failure": failure
+            })
+        } else if obj.get("isValid").is_some() || obj.get("error").is_some() {
+            // Legacy validationStatus: { isValid, error?, code?, explanation?, uri? }
+            let code = obj
+                .get("code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("validation.legacy");
+            let explanation = obj.get("explanation").and_then(|v| v.as_str());
+            let url = obj.get("uri").and_then(|v| v.as_str());
+            let entry = serde_json::json!({
+                "code": code,
+                "url": url,
+                "explanation": explanation
+            });
+            let (success, failure) = match obj.get("isValid").and_then(|v| v.as_bool()) {
+                Some(true) => (vec![entry], vec![]),
+                Some(false) => (vec![], vec![entry]),
+                None => (vec![], vec![entry]),
+            };
+            serde_json::json!({
+                "success": success,
+                "informational": [],
+                "failure": failure
+            })
+        } else {
+            empty_status
+        }
+    } else {
+        empty_status.clone()
+    };
+
+    let ingredient_deltas = input
+        .get("ingredientDeltas")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "activeManifest": active_manifest,
+        "ingredientDeltas": ingredient_deltas
+    })
+}
+
+/// Normalizes crJSON so validation data is under `validationResults` in the shape required by
+/// the crJSON schema. Only legacy `extras:validation_status` is moved and converted;
+/// if the document already has `validationResults` (e.g. from c2pa-rs), it is left unchanged.
+/// Idempotent when already normalized or when c2pa-rs already emitted validationResults.
+pub fn normalize_crjson_validation_results(value: &mut serde_json::Value) {
+    let obj = match value.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+    if let Some(legacy) = obj.remove("extras:validation_status") {
+        let conformant = validation_results_to_schema_shape(&legacy);
+        obj.insert("validationResults".to_string(), conformant);
+    }
+}
 
 /// Result of extracting a manifest from a file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +163,10 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Extract a C2PA manifest from a file in JPEG Trust format
+/// Extract a C2PA manifest from a file in JPEG Trust format.
+///
+/// When the `jpeg_trust` feature is enabled and c2pa-rs exposes `JpegTrustReader`, this uses
+/// that for full JPT output (including asset hash). Otherwise it uses the standard `Reader`.
 ///
 /// # Arguments
 ///
@@ -79,7 +174,8 @@ pub struct ValidationError {
 ///
 /// # Returns
 ///
-/// A `ManifestExtractionResult` containing the extracted manifest data
+/// A `ManifestExtractionResult` containing the extracted manifest data.
+/// For crJSON format output, use [`extract_crjson_manifest`] instead.
 ///
 /// # Errors
 ///
@@ -87,6 +183,7 @@ pub struct ValidationError {
 /// - The file does not exist
 /// - The file does not contain a valid C2PA manifest
 /// - The manifest cannot be parsed
+#[cfg(feature = "jpeg_trust")]
 pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
     let input_path = input_path.as_ref();
 
@@ -94,25 +191,20 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
 
-    // Use JPEG Trust Reader
     let mut jpt_reader = JpegTrustReader::from_file(input_path).context(
         "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
     )?;
 
-    // Compute asset hash
     let asset_hash = jpt_reader.compute_asset_hash_from_file(input_path).ok();
 
-    // Get the active manifest label
     let active_label = jpt_reader
         .inner()
         .active_label()
         .context("No active C2PA manifest found in the input file")?
         .to_string();
 
-    // Get the manifest JSON
     let manifest_json = jpt_reader.json();
 
-    // Parse to serde_json::Value
     let manifest_value: serde_json::Value =
         serde_json::from_str(&manifest_json).context("Failed to parse extracted manifest JSON")?;
 
@@ -120,6 +212,91 @@ pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExt
         input_path: input_path.to_string_lossy().to_string(),
         active_label,
         asset_hash,
+        manifest_json,
+        manifest_value,
+    })
+}
+
+/// Fallback when `jpeg_trust` is not enabled: use standard Reader (no asset hash).
+#[cfg(not(feature = "jpeg_trust"))]
+pub fn extract_jpt_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
+    let input_path = input_path.as_ref();
+
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    let reader = Reader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = reader
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?
+        .to_string();
+
+    let manifest_json = reader.json();
+
+    let manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted manifest JSON")?;
+
+    Ok(ManifestExtractionResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        active_label,
+        asset_hash: None,
+        manifest_json,
+        manifest_value,
+    })
+}
+
+/// Extract a C2PA manifest from a file in crJSON format using the c2pa-rs CrJsonReader.
+///
+/// # Arguments
+///
+/// * `input_path` - Path to the input file containing a C2PA manifest
+///
+/// # Returns
+///
+/// A `ManifestExtractionResult` containing the extracted manifest data in crJSON format.
+/// `asset_hash` is not computed by CrJsonReader and will be `None`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The file does not exist
+/// - The file does not contain a valid C2PA manifest
+/// - The manifest cannot be parsed to crJSON
+pub fn extract_crjson_manifest<P: AsRef<Path>>(input_path: P) -> Result<ManifestExtractionResult> {
+    let input_path = input_path.as_ref();
+
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    let crjson_reader = CrJsonReader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = crjson_reader
+        .inner()
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?
+        .to_string();
+
+    let manifest_json = crjson_reader.json();
+
+    let mut manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted crJSON")?;
+
+    normalize_crjson_validation_results(&mut manifest_value);
+
+    let manifest_json = serde_json::to_string_pretty(&manifest_value)
+        .context("Failed to re-serialize crJSON after normalization")?;
+
+    Ok(ManifestExtractionResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        active_label,
+        asset_hash: None,
         manifest_json,
         manifest_value,
     })
@@ -212,12 +389,22 @@ pub fn validate_json_file<P: AsRef<Path>>(
 
 /// Get the default schema path relative to the crate root
 ///
-/// This returns the path to the bundled indicators schema.
+/// This returns the path to the bundled JPEG Trust indicators schema.
 pub fn default_schema_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("INTERNAL")
         .join("schemas")
         .join("indicators-schema.json")
+}
+
+/// Get the crJSON schema path relative to the crate root
+///
+/// Use this when validating crJSON documents (e.g. output of `--extract --crjson`).
+pub fn crjson_schema_path() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("INTERNAL")
+        .join("schemas")
+        .join("crJSON-schema.json")
 }
 
 /// Converts dashed JUMBF identifier to proper URI form (with '/').
@@ -297,6 +484,16 @@ mod tests {
         assert!(
             schema_path.exists(),
             "Default schema path should exist: {:?}",
+            schema_path
+        );
+    }
+
+    #[test]
+    fn test_crjson_schema_path_exists() {
+        let schema_path = crjson_schema_path();
+        assert!(
+            schema_path.exists(),
+            "crJSON schema path should exist: {:?}",
             schema_path
         );
     }

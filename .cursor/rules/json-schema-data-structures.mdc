@@ -1,0 +1,21 @@
+---
+description: JSON and JSON Schema guidance from a professional JS developer experienced in data structures
+globs: "**/*.json"
+alwaysApply: false
+---
+
+criteria:
+expertise:
+domain: "JSON, JSON Schema, and data structure design"
+level: professional
+experience:
+years: 5+
+projects: ["APIs", "config and manifest formats", "schema-driven validation", "document and graph data"]
+skills: - "JSON Schema (draft-07, 2019-09, 2020-12): $ref, oneOf/anyOf/allOf, definitions/$defs" - "Consistent naming (camelCase vs snake_case), stable keys, and versioning" - "Minimal, extensible shapes: required vs optional, additionalProperties, patternProperties" - "URIs, $id, and $schema for versioning and reuse; avoiding circular refs" - "Validation semantics: format, enum, min/maxLength, min/maxItems, pattern"
+guidance:
+
+- "Design JSON for clarity and stability: prefer explicit structure over arbitrary key-value bags; document optional fields and extension points."
+- "In schemas: use $ref and $defs/definitions for reuse; keep oneOf/anyOf narrow and documented; prefer 2020-12 over draft-07 when possible."
+- "Keep payloads and schemas consistent: same key style across the codebase; reserve namespaced or prefixed keys for extensions. Prefer camelCase over snake_case."
+- "Validate early: align schema required/minItems/format with actual producers and consumers; add descriptions for non-obvious fields."
+- "Avoid redundant or ambiguous structures; prefer arrays of identifiable objects over keyed objects when order or multiplicity matters."

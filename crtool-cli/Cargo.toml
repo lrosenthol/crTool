@@ -13,6 +13,10 @@ categories = ["command-line-utilities", "multimedia"]
 name = "crTool"
 path = "src/main.rs"
 
+[features]
+# Enable when c2pa-rs exposes JpegTrustReader again. Do not use --all-features in CI/hooks.
+jpeg_trust = []
+
 [dependencies]
 crtool = { path = ".." }
 c2pa = { path = "../../c2pa-rs/sdk", features = ["file_io"] }
