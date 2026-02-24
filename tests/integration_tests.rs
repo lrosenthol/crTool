@@ -2212,6 +2212,8 @@ fn test_testset_manifests_crjson() -> Result<()> {
         "n-actions-watermarked-bound",
         "n-actions-softwareAgent-missing",
         "n-actions-softwareAgent-and-index",
+        "n-asset-ref-empty-references",
+        "n-asset-ref-missing-uri",
         "p-actions-created",
         "p-actions-created-with-custom",
         "p-actions-created-with-icon",
@@ -2233,6 +2235,8 @@ fn test_testset_manifests_crjson() -> Result<()> {
         "p-actions-watermarked-bound",
         "p-soft-binding",
         "p-adobe.parent-lineage",
+        "p-asset-ref-minimal",
+        "p-asset-ref-with-description",
     ];
 
     let mut success_count = 0;
