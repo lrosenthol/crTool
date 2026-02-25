@@ -20,7 +20,9 @@ use std::process::Command;
 
 mod common;
 
-use common::{certs_dir, manifests_dir, output_dir, sign_file_with_manifest, testfiles_dir};
+use common::{
+    certs_dir, fixtures_dir, manifests_dir, output_dir, sign_file_with_manifest, testfiles_dir,
+};
 
 fn generate_extraction_output_crjson(input: &str, subdir: &str) -> PathBuf {
     let dir = output_dir().join(subdir);
@@ -441,5 +443,99 @@ fn test_crjson_output_to_directory() -> Result<()> {
     );
 
     println!("✓ crJSON extraction to directory works");
+    Ok(())
+}
+
+// ============================================================================
+// Trust list validation (--trust with crJSON)
+// ============================================================================
+
+/// Asset signed with a certificate on the C2PA/Content Credentials trust lists;
+/// extraction with --trust --crjson should report signingCredential.trusted.
+const TRUSTED_ASSET: &str = "assets/PXL_20260208_202351558.jpg";
+
+/// Extracts crJSON with --trust and asserts the active manifest is reported as trusted.
+/// Requires network to fetch trust lists on first run.
+#[test]
+fn test_extract_crjson_with_trust_reports_trusted() -> Result<()> {
+    let input = fixtures_dir().join(TRUSTED_ASSET);
+    if !input.exists() {
+        eprintln!("Skipping: fixture {} not found", input.display());
+        return Ok(());
+    }
+
+    let out_dir = output_dir().join("trust_crjson");
+    fs::create_dir_all(&out_dir)?;
+
+    let binary = get_binary_path();
+    let result = Command::new(&binary)
+        .arg("--trust")
+        .arg("--extract")
+        .arg("--crjson")
+        .arg(&input)
+        .arg("--output")
+        .arg(&out_dir)
+        .output()?;
+
+    assert!(
+        result.status.success(),
+        "Extraction with --trust failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("asset");
+    let json_path = out_dir.join(format!("{}_manifest_crjson.json", stem));
+    assert!(
+        json_path.exists(),
+        "Expected output file {}",
+        json_path.display()
+    );
+
+    let json_content = fs::read_to_string(&json_path)?;
+    let value: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    let success_codes = value
+        .get("validationResults")
+        .and_then(|v| v.get("activeManifest"))
+        .and_then(|v| v.get("success"))
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("validationResults.activeManifest.success not found"))?;
+
+    let has_trusted = success_codes.iter().any(|entry| {
+        entry
+            .get("code")
+            .and_then(|c| c.as_str())
+            .map(|c| c == "signingCredential.trusted")
+            .unwrap_or(false)
+    });
+    assert!(
+        has_trusted,
+        "Expected signingCredential.trusted in success list; success codes: {:?}",
+        success_codes
+            .iter()
+            .filter_map(|e| e.get("code").and_then(|c| c.as_str()))
+            .collect::<Vec<_>>()
+    );
+
+    let failures = value
+        .get("validationResults")
+        .and_then(|v| v.get("activeManifest"))
+        .and_then(|v| v.get("failure"))
+        .and_then(|v| v.as_array())
+        .map_or([].as_slice(), |a| a.as_slice());
+    assert!(
+        failures.is_empty(),
+        "Expected no validation failures; got: {:?}",
+        failures
+    );
+
+    println!(
+        "✓ --trust --crjson reports signingCredential.trusted for {}",
+        TRUSTED_ASSET
+    );
     Ok(())
 }

@@ -14,8 +14,9 @@ governing permissions and limitations under the License.
 #![allow(unexpected_cfgs)]
 
 use crtool::{
-    default_schema_path, extract_crjson_manifest, validate_json_value, ManifestExtractionResult,
-    ValidationResult,
+    apply_trust_settings, default_schema_path, extract_crjson_manifest, validate_json_value,
+    ManifestExtractionResult, ValidationResult, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
+    INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
 };
 use eframe::egui;
 use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
@@ -54,6 +55,51 @@ fn arg_to_path(arg: &str) -> PathBuf {
     PathBuf::from(arg)
 }
 
+/// Load C2PA and Content Credentials trust lists and apply for validation. Runs at GUI startup.
+fn load_trust_lists_for_gui() {
+    let client = match reqwest::blocking::Client::builder()
+        .user_agent("crTool-gui/1.0")
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Trust lists: failed to create HTTP client: {}", e);
+            return;
+        }
+    };
+    let fetch = |url: &str| -> Option<String> {
+        client
+            .get(url)
+            .send()
+            .and_then(|r| r.error_for_status())
+            .and_then(|r| r.text())
+            .map_err(|e| eprintln!("Trust lists: failed to fetch {}: {}", url, e))
+            .ok()
+    };
+    let c2pa_anchors = match fetch(C2PA_TRUST_ANCHORS_URL) {
+        Some(s) => s,
+        None => return,
+    };
+    let interim_anchors = match fetch(INTERIM_TRUST_ANCHORS_URL) {
+        Some(s) => s,
+        None => return,
+    };
+    let trust_anchors = format!(
+        "{}\n{}",
+        c2pa_anchors.trim_end(),
+        interim_anchors.trim_end()
+    );
+    let allowed_list = fetch(INTERIM_ALLOWED_LIST_URL);
+    let trust_config = fetch(INTERIM_TRUST_CONFIG_URL);
+    if let Err(e) = apply_trust_settings(
+        &trust_anchors,
+        allowed_list.as_deref().map(|s| s.trim()),
+        trust_config.as_deref().map(|s| s.trim()),
+    ) {
+        eprintln!("Trust lists: failed to apply settings: {}", e);
+    }
+}
+
 fn main() -> Result<(), eframe::Error> {
     #[cfg(target_os = "macos")]
     macos_open_document::install_handler();
@@ -75,6 +121,8 @@ fn main() -> Result<(), eframe::Error> {
             // Register Cocoa open-document handler (Dock drop, "Open With"). Must run after NSApp exists.
             #[cfg(target_os = "macos")]
             macos_open_document::install_cocoa_handler();
+            // Load C2PA and Content Credentials trust lists so validation uses them for all reads
+            load_trust_lists_for_gui();
             // Open file from command line (e.g. "open -a crTool file.jpg" or drop on app icon)
             let initial_file = std::env::args().skip(1).find_map(|arg| {
                 let path = arg_to_path(&arg);

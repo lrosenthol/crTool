@@ -18,7 +18,10 @@ use c2pa::{
     SigningAlg,
 };
 use clap::Parser;
-use crtool::SUPPORTED_ASSET_EXTENSIONS;
+use crtool::{
+    apply_trust_settings, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
+    INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL, SUPPORTED_ASSET_EXTENSIONS,
+};
 use glob::glob;
 use serde_json::Value as JsonValue;
 use std::fs;
@@ -85,6 +88,10 @@ struct Cli {
     /// Validate JSON files against the indicators schema
     #[arg(short = 'v', long, default_value = "false")]
     validate: bool,
+
+    /// Enable trust list validation: load the official C2PA trust list and the Content Credentials interim trust list for certificate validation during extract/read
+    #[arg(long, default_value = "false")]
+    trust: bool,
 }
 
 /// Configuration for processing files with C2PA manifests
@@ -108,6 +115,52 @@ enum ExtractFormat {
     Jpt,
     /// crJSON format (CrJsonReader)
     CrJson,
+}
+
+/// Fetch a URL and return the response body as a string
+fn fetch_url(url: &str) -> Result<String> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("crTool/1.0")
+        .build()
+        .context("Failed to create HTTP client")?;
+    let response = client
+        .get(url)
+        .send()
+        .context(format!("Failed to fetch {}", url))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .context(format!("Failed to read response body from {}", url))?;
+    if !status.is_success() {
+        anyhow::bail!("{} returned {}: {}", url, status, body);
+    }
+    Ok(body)
+}
+
+/// Load the official C2PA trust list and the Content Credentials interim trust list from their
+/// canonical URLs, merge trust anchors, and apply thread-local Settings for validation.
+fn load_trust_lists_and_apply() -> Result<()> {
+    println!("Loading C2PA and Content Credentials trust lists...");
+    let c2pa_anchors =
+        fetch_url(C2PA_TRUST_ANCHORS_URL).context("Failed to fetch official C2PA trust list")?;
+    let interim_anchors =
+        fetch_url(INTERIM_TRUST_ANCHORS_URL).context("Failed to fetch interim trust anchors")?;
+    let trust_anchors = format!(
+        "{}\n{}",
+        c2pa_anchors.trim_end(),
+        interim_anchors.trim_end()
+    );
+    let allowed_list =
+        fetch_url(INTERIM_ALLOWED_LIST_URL).context("Failed to fetch interim allowed list")?;
+    let trust_config =
+        fetch_url(INTERIM_TRUST_CONFIG_URL).context("Failed to fetch interim trust config")?;
+    apply_trust_settings(
+        &trust_anchors,
+        Some(allowed_list.trim()),
+        Some(trust_config.trim()),
+    )?;
+    println!("  Trust list validation enabled");
+    Ok(())
 }
 
 /// Expand glob patterns and collect matching file paths
@@ -898,6 +951,10 @@ fn validate_json_files(
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.trust {
+        load_trust_lists_and_apply().context("Failed to load trust lists")?;
+    }
 
     // Expand glob patterns and collect all input files
     let input_files =

@@ -15,6 +15,7 @@ governing permissions and limitations under the License.
 //! Core library for extracting and validating C2PA manifests in JPEG Trust and crJSON formats.
 
 use anyhow::{Context, Result};
+use c2pa::settings::Settings;
 use c2pa::CrJsonReader;
 #[cfg(feature = "jpeg_trust")]
 use c2pa::JpegTrustReader;
@@ -405,6 +406,54 @@ pub fn crjson_schema_path() -> std::path::PathBuf {
         .join("INTERNAL")
         .join("schemas")
         .join("crJSON-schema.json")
+}
+
+/// Trust list URLs: official C2PA trust list and Content Credentials interim list.
+/// See <https://opensource.contentauthenticity.org/docs/c2patool/docs/usage/#configuring-trust-support>.
+pub const C2PA_TRUST_ANCHORS_URL: &str =
+    "https://raw.githubusercontent.com/c2pa-org/conformance-public/refs/heads/main/trust-list/C2PA-TRUST-LIST.pem";
+pub const INTERIM_TRUST_ANCHORS_URL: &str = "https://contentcredentials.org/trust/anchors.pem";
+pub const INTERIM_ALLOWED_LIST_URL: &str =
+    "https://contentcredentials.org/trust/allowed.sha256.txt";
+pub const INTERIM_TRUST_CONFIG_URL: &str = "https://contentcredentials.org/trust/store.cfg";
+
+/// Applies C2PA trust settings to the thread-local Settings used by Reader/CrJsonReader/JpegTrustReader.
+/// Call this before extracting or reading manifests to validate signing certificates against the
+/// given trust anchors, optional allowed list, and optional trust config (EKU OIDs).
+///
+/// * `trust_anchors` - PEM bundle of trust anchor root certificates (required).
+/// * `allowed_list` - Optional PEM bundle or SHA256 hash list of explicitly allowed signing certificates.
+/// * `trust_config` - Optional list of allowed EKU OIDs in dot notation.
+///
+/// Also enables `verify.verify_trust` so that the SDK actually performs trust validation.
+pub fn apply_trust_settings(
+    trust_anchors: &str,
+    allowed_list: Option<&str>,
+    trust_config: Option<&str>,
+) -> Result<()> {
+    fn escape_toml_literal(s: &str) -> String {
+        s.replace('\'', "''")
+    }
+    let mut toml = format!(
+        "[trust]\ntrust_anchors = '''{}'''\n",
+        escape_toml_literal(trust_anchors)
+    );
+    if let Some(al) = allowed_list {
+        toml.push_str(&format!(
+            "allowed_list = '''{}'''\n",
+            escape_toml_literal(al)
+        ));
+    }
+    if let Some(tc) = trust_config {
+        toml.push_str(&format!(
+            "trust_config = '''{}'''\n",
+            escape_toml_literal(tc)
+        ));
+    }
+    toml.push_str("\n[verify]\nverify_trust = true\n");
+    Settings::from_toml(&toml)
+        .map_err(|e| anyhow::anyhow!("Failed to apply trust settings: {}", e))?;
+    Ok(())
 }
 
 /// Converts dashed JUMBF identifier to proper URI form (with '/').
