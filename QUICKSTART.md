@@ -1,33 +1,50 @@
 # Quick Start Guide
 
-Get started with Content Credential Tool in 5 minutes!
+Get started with Content Credential Tool in a few minutes. Choose the **CLI** (command line) or **GUI** (graphical app).
 
-## Step 1: Build the Tool
+## Prerequisites
 
-```bash
-cargo build --release
+- **Rust 1.70+** — [rustup.rs](https://rustup.rs/)
+- **c2pa-rs** — Clone as a sibling of crTool (see [SETUP.md](SETUP.md))
+
+```text
+parent/
+├── crTool/
+└── c2pa-rs/
 ```
 
-## Step 2: Generate Test Certificates
+## Quick Start: CLI
+
+### 1. Build
+
+```bash
+cargo build --release -p crTool
+```
+
+### 2. Generate test certificates (optional)
 
 ```bash
 ./generate_test_certs.sh
 ```
 
-This creates self-signed certificates in `examples/certs/` for testing.
+Creates self-signed certs in `examples/certs/` for ES256, ES384, ES512, PS256, etc.
 
-## Step 3: Create a Test Image
+### 3. Sign an image
 
-If you don't have a test image, create one or download one:
+Use the included test certs with `--allow-self-signed`:
 
 ```bash
-# Download a sample image (example using curl)
-curl -o test.jpg https://via.placeholder.com/800x600.jpg
+./target/release/crTool \
+  --manifest examples/simple_manifest.json \
+  testfiles/Dog.jpg \
+  --output test_signed.jpg \
+  --cert tests/fixtures/certs/ed25519.pub \
+  --key tests/fixtures/certs/ed25519.pem \
+  --algorithm ed25519 \
+  --allow-self-signed
 ```
 
-Or use any JPEG or PNG image you have.
-
-## Step 4: Run the Tool
+Or with generated certs:
 
 ```bash
 ./target/release/crTool \
@@ -39,85 +56,79 @@ Or use any JPEG or PNG image you have.
   --algorithm es256
 ```
 
-## Step 5: Verify the Manifest
-
-Install and use the c2pa-tool to verify:
+### 4. Verify (optional)
 
 ```bash
-# Install verification tool
 cargo install c2pa-tool
-
-# Verify and display the manifest
 c2pa test_signed.jpg
 ```
 
-## What's Next?
+---
 
-1. **Customize manifests**: Edit the JSON files in `examples/` to match your use case
-2. **Try different examples**:
-   - `simple_manifest.json` - Basic manifest
-   - `full_manifest.json` - Complete metadata
-   - `with_ingredients.json` - Composite images
-3. **Integrate**: Use this tool in your build pipeline or workflow
-4. **Read the docs**: Check `README.md` for detailed documentation
+## Quick Start: GUI
+
+### 1. Build and run
+
+```bash
+cargo build --release -p crTool-gui
+cargo run --release -p crTool-gui
+```
+
+Or use the build script:
+
+```bash
+./build.sh --gui-only --release
+cargo run --release -p crTool-gui
+```
+
+### 2. Use the GUI
+
+1. Click **"📂 Select Image File"** or drag and drop a file.
+2. Choose a JPEG, PNG, or WebP with a C2PA manifest (e.g. `testset/test_ingredient_manifest.jpg`).
+3. View results:
+   - ✓ Green checkmark if valid, ✗ red X with errors if invalid
+   - Trust status (Trusted/Untrusted) from C2PA and Content Credentials trust lists
+   - Asset hash and manifest label
+   - Tree view and "Show Raw JSON" toggle
+
+### 3. Verify setup (optional)
+
+```bash
+./verify-gui-setup.sh
+```
+
+---
+
+## Build both CLI and GUI
+
+```bash
+cargo build --release --workspace
+```
+
+Binaries:
+
+- `target/release/crTool` — CLI  
+- `target/release/crTool-gui` — GUI  
+
+---
+
+## What’s next?
+
+- **CLI**: See [README.md](README.md) for all options (extract, validate, multiple files, globs, `--crjson`, `--trust`).
+- **GUI**: See [crtool-gui/README.md](crtool-gui/README.md) and [Cursor-Docs/GUI_IMPLEMENTATION.md](Cursor-Docs/GUI_IMPLEMENTATION.md).
+- **Setup**: Full clone and verify steps in [SETUP.md](SETUP.md).
+- **Development**: Hooks, fmt, clippy in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Troubleshooting
 
-**Error: "Input file does not exist"**
-- Make sure the input file path is correct
-- Use absolute paths if relative paths don't work
+**"Input file does not exist"** — Check path; try absolute path.
 
-**Error: "Failed to create signer"**
-- Ensure certificate and key files exist
-- Check that the algorithm matches your key type
+**"Failed to create signer"** — Ensure cert and key exist and algorithm matches key type.
 
-**Error: "Failed to sign and embed manifest"**
-- Verify your manifest JSON is valid
-- Ensure the input file format is supported (JPEG, PNG, etc.)
+**"Failed to sign and embed manifest"** — Check manifest JSON and that input format is supported.
 
-## Common Use Cases
+**Build errors** — Ensure `c2pa-rs` is at `../c2pa-rs/` and run `./verify_setup.sh`.
 
-### Original Creation
-```bash
-# Mark an original photo with your authorship
-./target/release/crTool \
-  --manifest examples/simple_manifest.json \
-  --input original.jpg \
-  --output signed_original.jpg \
-  --cert examples/certs/es256_cert.pem \
-  --key examples/certs/es256_private.pem
-```
+**GUI won’t start** — Update Rust and graphics drivers; on Linux ensure XDG portal is available for file dialogs.
 
-### Edited Content
-```bash
-# Document editing history with full metadata
-./target/release/crTool \
-  --manifest examples/full_manifest.json \
-  --input edited_photo.jpg \
-  --output signed_edited.jpg \
-  --cert examples/certs/es256_cert.pem \
-  --key examples/certs/es256_private.pem
-```
-
-### Batch Processing
-```bash
-# Process multiple files
-for file in input/*.jpg; do
-  basename=$(basename "$file")
-  ./target/release/crTool \
-    --manifest examples/simple_manifest.json \
-    --input "$file" \
-    --output "output/$basename" \
-    --cert examples/certs/es256_cert.pem \
-    --key examples/certs/es256_private.pem
-done
-```
-
-## Help
-
-For more options:
-```bash
-./target/release/crTool --help
-```
-
-For detailed documentation, see [README.md](README.md).
+**Help** — CLI: `./target/release/crTool --help`
