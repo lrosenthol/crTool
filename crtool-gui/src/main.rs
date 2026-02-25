@@ -1211,6 +1211,22 @@ fn ingredient_node_details(
     }
 }
 
+/// Format an RFC3339 / ISO 8601 timestamp string as "Mon DD, YYYY" (e.g. "Feb 24, 2026").
+fn format_rfc3339_date(s: &str) -> Option<String> {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let date_part = s.split('T').next()?;
+    let mut parts = date_part.split('-');
+    let year: u32 = parts.next()?.parse().ok()?;
+    let month: usize = parts.next()?.parse().ok()?;
+    let day: u32 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || day == 0 || day > 31 {
+        return None;
+    }
+    Some(format!("{} {}, {}", MONTHS[month - 1], day, year))
+}
+
 /// Get "Issued by" name and date from the active manifest's signature (subject CN/O and timestamp).
 /// Returns (name, date_string) for display as "Issued by: {name} on {date}".
 fn get_signature_issued_info(
@@ -1240,19 +1256,7 @@ fn get_signature_issued_info(
     let date = sig
         .get("timestamp")
         .and_then(|v| v.as_str())
-        .and_then(|s| {
-            // Parse as RFC3339 first (ISO 8601); format nicely
-            time::OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339)
-                .ok()
-                .and_then(|dt| {
-                    // "Feb 24, 2026"
-                    dt.format(
-                        &time::format_description::parse("[month repr:short] [day], [year]")
-                            .ok()?,
-                    )
-                    .ok()
-                })
-        })
+        .and_then(format_rfc3339_date)
         .unwrap_or_else(|| "—".to_string());
     Some((name, date))
 }
