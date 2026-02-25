@@ -1,91 +1,136 @@
 # Project Structure
 
+crTool is a Cargo workspace with a shared library and two applications: CLI and GUI.
+
 ```
 crTool/
+├── Cargo.toml                     # Workspace root (members: ., crtool-cli, crtool-gui)
 ├── src/
-│   └── main.rs                    # Main CLI application
+│   └── lib.rs                     # crtool library (manifest extraction, validation, Builder)
+├── crtool-cli/
+│   ├── Cargo.toml                 # CLI package (binary name: crTool)
+│   ├── README.md
+│   └── src/
+│       └── main.rs                # CLI implementation (clap, sign/extract/validate)
+├── crtool-gui/
+│   ├── Cargo.toml                 # GUI package (binary name: crTool-gui)
+│   ├── README.md
+│   ├── build.rs
+│   ├── macos/                     # macOS app bundle assets
+│   │   ├── Info.plist
+│   │   ├── crTool.entitlements
+│   │   └── open_document_handler.m
+│   └── src/
+│       ├── main.rs                # GUI implementation (eframe/egui)
+│       ├── macos_open_document.rs
+│       └── security_scoped.rs
 ├── examples/
-│   ├── simple_manifest.json       # Basic manifest example
-│   ├── full_manifest.json         # Complete metadata example
-│   ├── with_ingredients.json      # Composite image example
-│   └── README.md                  # Examples documentation
-├── Cargo.toml                     # Rust project configuration
-├── README.md                      # Main documentation
-├── QUICKSTART.md                  # Quick start guide
-├── LICENSE                        # MIT License
-├── .gitignore                     # Git ignore rules
-└── generate_test_certs.sh         # Certificate generation script
+│   ├── README.md
+│   ├── simple_manifest.json
+│   ├── full_manifest.json
+│   ├── with_ingredients.json
+│   ├── with_ingredients_from_files.json
+│   ├── simple_with_ingredient.json
+│   ├── actions_v2_*.json
+│   ├── asset_ref_manifest.json
+│   ├── cloud_data_manifest.json
+│   ├── depthmap_gdepth_manifest.json
+│   ├── external_reference_manifest.json
+│   ├── asset_type_manifest.json
+│   ├── specVersion_manifest.json
+│   └── ...
+├── testfiles/                     # Test images (Dog.jpg, Dog.png, Dog.webp)
+├── testset/                       # Additional test assets and JSON (GUI/manifest tests)
+├── tests/
+│   ├── README.md                  # Test suite documentation
+│   ├── integration_tests.rs       # Sign + verify integration tests
+│   ├── test_crjson_extraction.rs
+│   ├── test_jpt_extraction.rs
+│   ├── test_validation.rs
+│   ├── common/
+│   │   └── mod.rs                 # Test helpers
+│   └── fixtures/
+│       ├── certs/                # ed25519.pem, ed25519.pub, es256_*
+│       ├── assets/
+│       └── *.json                # Validation test fixtures
+├── INTERNAL/
+│   ├── cddl/                      # CDDL definitions
+│   └── schemas/
+│       ├── crJSON-schema.json
+│       └── indicators-schema.json
+├── scripts/
+│   ├── install-hooks.sh           # Git pre-commit hooks (fmt, clippy)
+│   └── format.sh
+├── .github/workflows/
+│   ├── ci.yml
+│   └── format-check.yml
+├── .git-hooks/
+│   └── pre-commit
+├── build.sh                       # Build script (--all, --gui-only, --mac-app)
+├── verify_setup.sh                # Verify clone, deps, build, tests
+├── verify-gui-setup.sh            # Verify GUI build
+├── generate_test_certs.sh         # Generate example certs (examples/certs/)
+├── README.md
+├── QUICKSTART.md
+├── PROJECT_STRUCTURE.md
+├── SETUP.md                       # Initial setup and first run
+├── DEVELOPMENT.md                 # Development workflow and tooling
+├── TESTING.md                     # Integration test details
+├── CONTRIBUTING.md
+├── LICENSE
+└── rustfmt.toml
 ```
 
-## Key Files
+## Workspace Members
 
-### Source Code
-- **src/main.rs**: Complete CLI implementation with:
-  - Argument parsing using `clap`
-  - JSON manifest loading
-  - C2PA Builder integration
-  - Certificate-based signing
-  - Error handling with detailed context
+| Member      | Role    | Binary / library      |
+|------------|---------|------------------------|
+| `.` (root) | Library | `crtool` (lib only)    |
+| `crtool-cli` | CLI app | `crTool`              |
+| `crtool-gui` | GUI app | `crTool-gui`          |
 
-### Configuration Examples
-Three comprehensive JSON manifest examples:
-1. **simple_manifest.json**: Minimal setup for quick testing
-2. **full_manifest.json**: Complete metadata with EXIF and location
-3. **with_ingredients.json**: Multi-asset composition tracking
+## Key Directories
 
-### Documentation
-- **README.md**: Full documentation with API reference
-- **QUICKSTART.md**: 5-minute getting started guide
-- **examples/README.md**: Detailed examples documentation
+### Source
+- **src/lib.rs**: Shared library API (e.g. `extract_jpt_manifest`, `validate_json_value`, Builder from JSON). Used by both CLI and GUI.
+- **crtool-cli/src/main.rs**: CLI (sign, extract, validate) with `clap`, file I/O, and cert handling.
+- **crtool-gui/src/main.rs**: Native GUI for opening files, extracting manifests (crJSON), validation, tree view, and trust status.
 
-### Tools
-- **generate_test_certs.sh**: Generates test certificates for ES256, ES384, ES512, and PS256 algorithms
+### Examples and test data
+- **examples/**: Manifest JSON examples (simple, full, ingredients, actions_v2, etc.).
+- **testfiles/**: Dog.{jpg,png,webp} for integration tests.
+- **testset/**: Extra test images and JSON for GUI and validation tests.
 
-## Features Implemented
+### Build and verification
+- **build.sh**: `--all`, `--gui-only`, `--release`, `--mac-app` (macOS .app bundle).
+- **verify_setup.sh**: Checks Rust, c2pa-rs path, fixtures, build, and tests.
+- **verify-gui-setup.sh**: Checks library, CLI, and GUI build and lib tests.
 
-✅ JSON-driven manifest creation
-✅ Multiple signing algorithms (ES256, ES384, ES512, PS256, PS384, PS512, ED25519)
-✅ Flexible output (file or directory)
-✅ Comprehensive error handling
-✅ Complete documentation
-✅ Example manifests
-✅ Certificate generation tool
-✅ Type-safe Rust implementation
+### Schemas and internal
+- **INTERNAL/schemas/**: crJSON and indicators JSON schemas for validation.
+- **INTERNAL/cddl/**: CDDL definitions (reference only).
 
 ## Build Artifacts
 
-The project builds to:
-- `target/release/crTool` - CLI binary (optimized)
-- `target/debug/crTool` - CLI binary (debug)
+- `target/release/crTool` — CLI binary  
+- `target/release/crTool-gui` — GUI binary  
+- `target/debug/` — Debug builds for both  
+- `target/test_output/` — Signed images produced by integration tests  
 
 ## Dependencies
 
-Core dependencies:
-- `c2pa` v0.41 (with `file_io` and `unstable_api` features)
-- `clap` v4.5 (CLI framework)
-- `serde` + `serde_json` (JSON handling)
-- `anyhow` + `thiserror` (Error handling)
+- **Root (crtool lib)**: `c2pa` (path: `../c2pa-rs/sdk`), `serde`, `serde_json`, `anyhow`, `thiserror`, `jsonschema`.
+- **crtool-cli**: `crtool`, `c2pa`, `clap`, `reqwest`, `image`, `pem`, `x509-parser`, `jsonschema`, etc.
+- **crtool-gui**: `crtool`, `eframe`, `egui`, `rfd`, `egui_code_editor`, `egui_json_tree`, `reqwest`, etc.
 
-## Usage Pattern
+**Note**: The CLI and library expect a sibling `c2pa-rs` repo; see [SETUP.md](SETUP.md).
 
-```
-crTool \
-  --manifest <JSON_FILE> \
-  --input <MEDIA_FILE> \
-  --output <OUTPUT_PATH> \
-  --cert <CERT_PEM> \
-  --key <KEY_PEM> \
-  [--algorithm <ALG>]
-```
+## Documentation Map
 
-## Next Steps
-
-For users:
-1. Run `cargo build --release`
-2. Run `./generate_test_certs.sh`
-3. Follow QUICKSTART.md
-
-For developers:
-1. Read src/main.rs for implementation details
-2. Extend manifest examples as needed
-3. Add new features following Rust best practices
+- **README.md**: Overview, installation, usage, manifest format, options.
+- **QUICKSTART.md**: Short path to run CLI or GUI and verify.
+- **SETUP.md**: Prerequisites, clone, verify, first build and test.
+- **DEVELOPMENT.md**: Hooks, fmt, clippy, CI, workflow.
+- **TESTING.md**: Integration tests, certs, running and verifying.
+- **crtool-cli/README.md**, **crtool-gui/README.md**: Per-tool details.
+- **Cursor-Docs/**: Implementation and feature notes.

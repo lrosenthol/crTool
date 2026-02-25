@@ -212,8 +212,8 @@
             "name": "Debug crTool-gui",
             "cargo": {
                 "args": [
-                    "run",
-                    "--release",
+                    "build",
+                    "--bin=crTool-gui",
                     "--package=crTool-gui"
                 ],
                 "filter": {

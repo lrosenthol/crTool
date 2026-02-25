@@ -14,8 +14,9 @@ governing permissions and limitations under the License.
 #![allow(unexpected_cfgs)]
 
 use crtool::{
-    default_schema_path, extract_crjson_manifest, validate_json_value, ManifestExtractionResult,
-    ValidationResult,
+    apply_trust_settings, crjson_schema_path, extract_crjson_manifest, validate_json_value,
+    ManifestExtractionResult, ValidationResult, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
+    INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
 };
 use eframe::egui;
 use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
@@ -54,6 +55,51 @@ fn arg_to_path(arg: &str) -> PathBuf {
     PathBuf::from(arg)
 }
 
+/// Load C2PA and Content Credentials trust lists and apply for validation. Runs at GUI startup.
+fn load_trust_lists_for_gui() {
+    let client = match reqwest::blocking::Client::builder()
+        .user_agent("crTool-gui/1.0")
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Trust lists: failed to create HTTP client: {}", e);
+            return;
+        }
+    };
+    let fetch = |url: &str| -> Option<String> {
+        client
+            .get(url)
+            .send()
+            .and_then(|r| r.error_for_status())
+            .and_then(|r| r.text())
+            .map_err(|e| eprintln!("Trust lists: failed to fetch {}: {}", url, e))
+            .ok()
+    };
+    let c2pa_anchors = match fetch(C2PA_TRUST_ANCHORS_URL) {
+        Some(s) => s,
+        None => return,
+    };
+    let interim_anchors = match fetch(INTERIM_TRUST_ANCHORS_URL) {
+        Some(s) => s,
+        None => return,
+    };
+    let trust_anchors = format!(
+        "{}\n{}",
+        c2pa_anchors.trim_end(),
+        interim_anchors.trim_end()
+    );
+    let allowed_list = fetch(INTERIM_ALLOWED_LIST_URL);
+    let trust_config = fetch(INTERIM_TRUST_CONFIG_URL);
+    if let Err(e) = apply_trust_settings(
+        &trust_anchors,
+        allowed_list.as_deref().map(|s| s.trim()),
+        trust_config.as_deref().map(|s| s.trim()),
+    ) {
+        eprintln!("Trust lists: failed to apply settings: {}", e);
+    }
+}
+
 fn main() -> Result<(), eframe::Error> {
     #[cfg(target_os = "macos")]
     macos_open_document::install_handler();
@@ -75,6 +121,8 @@ fn main() -> Result<(), eframe::Error> {
             // Register Cocoa open-document handler (Dock drop, "Open With"). Must run after NSApp exists.
             #[cfg(target_os = "macos")]
             macos_open_document::install_cocoa_handler();
+            // Load C2PA and Content Credentials trust lists so validation uses them for all reads
+            load_trust_lists_for_gui();
             // Open file from command line (e.g. "open -a crTool file.jpg" or drop on app icon)
             let initial_file = std::env::args().skip(1).find_map(|arg| {
                 let path = arg_to_path(&arg);
@@ -123,7 +171,7 @@ impl CrtoolApp {
             validation_result: None,
             show_raw_json: false,
             raw_json_buffer: String::new(),
-            schema_path: default_schema_path(),
+            schema_path: crjson_schema_path(),
             split_ratio: 0.5,
         };
         if app.selected_file.is_some() {
@@ -170,6 +218,304 @@ impl CrtoolApp {
                     self.validation_result = None;
                 }
             }
+        }
+    }
+
+    // Helper closure to extract generator name from manifest JSON
+    fn get_generator_name(manifest_json: &serde_json::Value, active_label: &str) -> Option<String> {
+        let get_from_claim = |claim: &serde_json::Value| -> Option<String> {
+            // Try "claim_generator_info" as String or Object
+            if let Some(name) = claim.get("claim_generator_info") {
+                if name.is_string() {
+                    return name.as_str().map(|s| s.to_string());
+                } else if let Some(obj) = name.as_object() {
+                    // Take "name" from object if present
+                    if let Some(n) = obj.get("name").and_then(|v| v.as_str()) {
+                        return Some(n.to_string());
+                    }
+                }
+            }
+            // Fallback: try "claimGenerator" as String or Object
+            if let Some(name) = claim.get("claimGenerator") {
+                if name.is_string() {
+                    return name.as_str().map(|s| s.to_string());
+                } else if let Some(obj) = name.as_object() {
+                    if let Some(n) = obj.get("name").and_then(|v| v.as_str()) {
+                        return Some(n.to_string());
+                    }
+                }
+            }
+            None
+        };
+
+        // Get the active manifest
+        let manifests = manifest_json.get("manifests").and_then(|v| v.as_array());
+        let manifest_val = if let Some(manifests) = manifests {
+            manifests.iter().find(|m| {
+                m.get("label")
+                    .and_then(|l| l.as_str())
+                    .map(|lbl| lbl == active_label)
+                    .unwrap_or(false)
+            })
+        } else {
+            None
+        }
+        .unwrap_or(manifest_json);
+
+        // Try both "claim.v2" and "claim"
+        if let Some(claim_v2) = manifest_val.get("claim.v2") {
+            if let Some(gen) = get_from_claim(claim_v2) {
+                return Some(gen);
+            }
+        }
+        if let Some(claim) = manifest_val.get("claim") {
+            if let Some(gen) = get_from_claim(claim) {
+                return Some(gen);
+            }
+        }
+        // Also handle top-level claim if neither present
+        if let Some(gen) = get_from_claim(manifest_val) {
+            return Some(gen);
+        }
+        None
+    }
+
+    /// Renders the "Issued by" line and all UX shown after a manifest is successfully loaded
+    /// (status, trust, validation, raw JSON toggle, and manifest/tree panels).
+    fn show_manifest_loaded_ui(&mut self, ui: &mut egui::Ui, manifest: &ManifestExtractionResult) {
+        EmojiLabel::new(egui::RichText::new("✅ Manifest Extracted Successfully").size(18.0))
+            .show(ui);
+
+        // Status items with icons and readable colors
+        ui.horizontal(|ui| {
+            EmojiLabel::new(
+                egui::RichText::new(format!("📜 Active Manifest: {}", manifest.active_label))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(200, 160, 50)), // Darker yellow/gold
+            )
+            .show(ui);
+        });
+
+        // Issued by: {name} on {date} from the active manifest's signature
+        let (name, date) =
+            get_signature_issued_info(&manifest.manifest_value, &manifest.active_label)
+                .unwrap_or_else(|| ("—".to_string(), "—".to_string()));
+        ui.horizontal(|ui| {
+            EmojiLabel::new(
+                egui::RichText::new(format!("📝 Issued by: {} on {}", name, date))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(100, 120, 140)),
+            )
+            .show(ui);
+        });
+
+        // Show the "App or device used" from generator information in claim (v1/v2), supporting both "claim_generator_info" and "claimGenerator"
+        let generator =
+            match Self::get_generator_name(&manifest.manifest_value, &manifest.active_label) {
+                Some(name) => name,
+                None => "—".to_string(),
+            };
+
+        ui.horizontal(|ui| {
+            EmojiLabel::new(
+                egui::RichText::new(format!("🛠️ App or device used: {}", generator))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(100, 120, 140)),
+            )
+            .show(ui);
+        });
+
+        // Trust status (from active manifest, not index 0)
+        if let Some(trust_status) =
+            get_trust_status(&manifest.manifest_value, &manifest.active_label)
+        {
+            ui.horizontal(|ui| {
+                let (icon, color, text) = match trust_status.as_str() {
+                    "signingCredential.trusted" => {
+                        ("🔒", egui::Color32::from_rgb(80, 220, 120), "Trusted")
+                    }
+                    "signingCredential.untrusted" => {
+                        ("🚫", egui::Color32::from_rgb(255, 100, 100), "Untrusted")
+                    }
+                    _ => (
+                        "⚠️",
+                        egui::Color32::from_rgb(128, 128, 128),
+                        trust_status.as_str(),
+                    ),
+                };
+                EmojiLabel::new(
+                    egui::RichText::new(format!("{} Trust Status: {}", icon, text))
+                        .size(15.0)
+                        .color(color),
+                )
+                .show(ui);
+            });
+        }
+
+        ui.separator();
+
+        // Validation status with red/green colors
+        if let Some(ref validation) = self.validation_result {
+            if validation.is_valid {
+                EmojiLabel::new(
+                    egui::RichText::new("✅ Manifest is valid according to JPEG Trust schema")
+                        .size(15.0)
+                        .color(egui::Color32::from_rgb(80, 220, 120)),
+                )
+                .show(ui);
+            } else {
+                EmojiLabel::new(
+                    egui::RichText::new(format!(
+                        "❌ Validation failed ({} error(s))",
+                        validation.errors.len()
+                    ))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(255, 100, 100)),
+                )
+                .show(ui);
+
+                ui.separator();
+
+                egui::ScrollArea::vertical()
+                    .id_salt("validation_errors")
+                    .max_height(200.0)
+                    .show(ui, |ui| {
+                        EmojiLabel::new(egui::RichText::new("⚠️  Validation Errors:").size(16.0))
+                            .show(ui);
+                        for error in &validation.errors {
+                            ui.group(|ui| {
+                                EmojiLabel::new(
+                                    egui::RichText::new(format!(
+                                        "📍 Path: {}",
+                                        error.instance_path
+                                    ))
+                                    .size(14.0)
+                                    .color(egui::Color32::from_rgb(255, 200, 100)),
+                                )
+                                .show(ui);
+                                EmojiLabel::new(
+                                    egui::RichText::new(format!("❌ Error: {}", error.message))
+                                        .size(14.0)
+                                        .color(egui::Color32::from_rgb(255, 150, 150)),
+                                )
+                                .show(ui);
+                            });
+                        }
+                    });
+            }
+        }
+
+        ui.separator();
+
+        // Toggle: Raw JSON replaces both Tree and Manifest Data views when on
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.show_raw_json, "");
+            EmojiLabel::new(
+                egui::RichText::new("📄 Show Raw JSON (replaces tree and manifest data)")
+                    .size(15.0),
+            )
+            .show(ui);
+        });
+
+        if self.show_raw_json {
+            ui.separator();
+            EmojiLabel::new(egui::RichText::new("📋 Raw JSON:").size(17.0)).show(ui);
+
+            // Read-only: refresh buffer from manifest each frame so edits are discarded
+            self.raw_json_buffer = manifest.manifest_json.clone();
+            let mut editor = CodeEditor::default()
+                .id_source("raw_json")
+                .with_rows(28)
+                .with_ui_fontsize(ui)
+                .with_theme(ColorTheme::AYU)
+                .with_syntax(json_syntax())
+                .with_numlines(false)
+                .vscroll(true);
+            editor.show(ui, &mut self.raw_json_buffer);
+        } else {
+            // Side by side: Manifest Data (left), resizer, Tree (right); 50/50 by default, resizable via drag
+            ui.separator();
+            let fill_height = ui.available_height();
+            let total_width = ui.available_width();
+            let content_width = (total_width - RESIZE_HANDLE_WIDTH).max(0.0);
+            let left_width = content_width * self.split_ratio;
+            let right_width = content_width - left_width;
+
+            ui.horizontal(|ui| {
+                // Left: Manifest Data — claim full left_width so layout advances correctly (egui advances by child min_rect)
+                let left_response = ui.allocate_ui_with_layout(
+                    egui::vec2(left_width, fill_height),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        ui.set_min_size(egui::vec2(left_width, fill_height));
+                        EmojiLabel::new(egui::RichText::new("📊 Manifest Data").size(16.0))
+                            .show(ui);
+                        egui::ScrollArea::vertical()
+                            .id_salt("manifest_data")
+                            .show(ui, |ui| {
+                                // Force content width to match panel so tree fills on init (not only after resize)
+                                ui.set_min_width((left_width - 16.0).max(0.0));
+                                JsonTree::new("manifest-data-tree", &manifest.manifest_value)
+                                    .default_expand(DefaultExpand::ToLevel(2))
+                                    .show(ui);
+                            });
+                    },
+                );
+
+                // Resize handle: stable id so drag is tracked across frames; draggable divider
+                let left_rect = left_response.response.rect;
+                let resize_rect = egui::Rect::from_min_size(
+                    left_rect.right_top(),
+                    egui::vec2(RESIZE_HANDLE_WIDTH, fill_height),
+                );
+                let resize_response = ui
+                    .push_id("manifest_tree_resize", |ui| {
+                        ui.allocate_rect(resize_rect, egui::Sense::drag())
+                    })
+                    .inner;
+                if resize_response.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                }
+                if resize_response.dragged() {
+                    if let Some(pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
+                        let panels_left = left_rect.left();
+                        let new_ratio = (pos.x - panels_left) / content_width;
+                        self.split_ratio = new_ratio.clamp(MIN_PANEL_RATIO, MAX_PANEL_RATIO);
+                    }
+                }
+                // Visible divider line
+                let painter = ui.painter_at(resize_rect);
+                let line_x = resize_rect.center().x;
+                painter.line_segment(
+                    [
+                        egui::pos2(line_x, resize_rect.top()),
+                        egui::pos2(line_x, resize_rect.bottom()),
+                    ],
+                    egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.fg_stroke.color),
+                );
+
+                // Right: Tree view — claim full right_width so it gets exactly the remaining space
+                ui.allocate_ui_with_layout(
+                    egui::vec2(right_width, fill_height),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        ui.set_min_size(egui::vec2(right_width, fill_height));
+                        EmojiLabel::new(
+                            egui::RichText::new("🌳 Manifest & Ingredients Tree").size(16.0),
+                        )
+                        .show(ui);
+                        egui::ScrollArea::vertical()
+                            .id_salt("tree_view")
+                            .show(ui, |ui| {
+                                display_manifest_ingredient_tree(
+                                    ui,
+                                    &manifest.manifest_value,
+                                    &manifest.active_label,
+                                );
+                            });
+                    },
+                );
+            });
         }
     }
 }
@@ -304,243 +650,8 @@ impl eframe::App for CrtoolApp {
             if let Some(ref result) = self.extraction_result {
                 match result {
                     Ok(manifest) => {
-                        EmojiLabel::new(
-                            egui::RichText::new("✅ Manifest Extracted Successfully").size(18.0),
-                        )
-                        .show(ui);
-
-                        // Status items with icons and readable colors
-                        ui.horizontal(|ui| {
-                            EmojiLabel::new(
-                                egui::RichText::new(format!(
-                                    "📜  Active Manifest: {}",
-                                    manifest.active_label
-                                ))
-                                .size(15.0)
-                                .color(egui::Color32::from_rgb(200, 160, 50)), // Darker yellow/gold
-                            )
-                            .show(ui);
-                        });
-
-                        if let Some(ref hash) = manifest.asset_hash {
-                            ui.horizontal(|ui| {
-                                EmojiLabel::new(
-                                    egui::RichText::new(format!("🔐 Asset Hash: {}", hash))
-                                        .size(15.0)
-                                        .color(egui::Color32::from_rgb(150, 200, 255)) // Medium blue
-                                        .monospace(),
-                                )
-                                .show(ui);
-                            });
-                        }
-
-                        // Trust status (from active manifest, not index 0)
-                        if let Some(trust_status) =
-                            get_trust_status(&manifest.manifest_value, &manifest.active_label)
-                        {
-                            ui.horizontal(|ui| {
-                                let (icon, color, text) = match trust_status.as_str() {
-                                    "signingCredential.trusted" => {
-                                        ("🔒", egui::Color32::from_rgb(80, 220, 120), "Trusted")
-                                    }
-                                    "signingCredential.untrusted" => {
-                                        ("🔓", egui::Color32::from_rgb(255, 100, 100), "Untrusted")
-                                    }
-                                    _ => (
-                                        "⚠️",
-                                        egui::Color32::from_rgb(128, 128, 128),
-                                        trust_status.as_str(),
-                                    ),
-                                };
-                                EmojiLabel::new(
-                                    egui::RichText::new(format!("{} Trust Status: {}", icon, text))
-                                        .size(15.0)
-                                        .color(color),
-                                )
-                                .show(ui);
-                            });
-                        }
-
-                        ui.separator();
-
-                        // Validation status with red/green colors
-                        if let Some(ref validation) = self.validation_result {
-                            if validation.is_valid {
-                                EmojiLabel::new(
-                                    egui::RichText::new(
-                                        "✅ Manifest is valid according to JPEG Trust schema",
-                                    )
-                                    .size(15.0)
-                                    .color(egui::Color32::from_rgb(80, 220, 120)),
-                                )
-                                .show(ui);
-                            } else {
-                                EmojiLabel::new(
-                                    egui::RichText::new(format!(
-                                        "❌ Validation failed ({} error(s))",
-                                        validation.errors.len()
-                                    ))
-                                    .size(15.0)
-                                    .color(egui::Color32::from_rgb(255, 100, 100)),
-                                )
-                                .show(ui);
-
-                                ui.separator();
-
-                                egui::ScrollArea::vertical()
-                                    .id_salt("validation_errors")
-                                    .max_height(200.0)
-                                    .show(ui, |ui| {
-                                        EmojiLabel::new(
-                                            egui::RichText::new("⚠️  Validation Errors:")
-                                                .size(16.0),
-                                        )
-                                        .show(ui);
-                                        for error in &validation.errors {
-                                            ui.group(|ui| {
-                                                EmojiLabel::new(
-                                                    egui::RichText::new(format!(
-                                                        "📍 Path: {}",
-                                                        error.instance_path
-                                                    ))
-                                                    .size(14.0)
-                                                    .color(egui::Color32::from_rgb(255, 200, 100)),
-                                                )
-                                                .show(ui);
-                                                EmojiLabel::new(
-                                                    egui::RichText::new(format!(
-                                                        "❌ Error: {}",
-                                                        error.message
-                                                    ))
-                                                    .size(14.0)
-                                                    .color(egui::Color32::from_rgb(255, 150, 150)),
-                                                )
-                                                .show(ui);
-                                            });
-                                        }
-                                    });
-                            }
-                        }
-
-                        ui.separator();
-
-                        // Toggle: Raw JSON replaces both Tree and Manifest Data views when on
-                        ui.horizontal(|ui| {
-                            ui.checkbox(&mut self.show_raw_json, "");
-                            EmojiLabel::new(
-                                egui::RichText::new("📄 Show Raw JSON (replaces tree and manifest data)")
-                                    .size(15.0),
-                            )
-                            .show(ui);
-                        });
-
-                        if self.show_raw_json {
-                            ui.separator();
-                            EmojiLabel::new(egui::RichText::new("📋 Raw JSON:").size(17.0))
-                                .show(ui);
-
-                            // Read-only: refresh buffer from manifest each frame so edits are discarded
-                            self.raw_json_buffer = manifest.manifest_json.clone();
-                            let mut editor = CodeEditor::default()
-                                .id_source("raw_json")
-                                .with_rows(28)
-                                .with_ui_fontsize(ui)
-                                .with_theme(ColorTheme::AYU)
-                                .with_syntax(json_syntax())
-                                .with_numlines(false)
-                                .vscroll(true);
-                            editor.show(ui, &mut self.raw_json_buffer);
-                        } else {
-                            // Side by side: Manifest Data (left), resizer, Tree (right); 50/50 by default, resizable via drag
-                            ui.separator();
-                            let fill_height = ui.available_height();
-                            let total_width = ui.available_width();
-                            let content_width = (total_width - RESIZE_HANDLE_WIDTH).max(0.0);
-                            let left_width = content_width * self.split_ratio;
-                            let right_width = content_width - left_width;
-
-                            ui.horizontal(|ui| {
-                                // Left: Manifest Data — claim full left_width so layout advances correctly (egui advances by child min_rect)
-                                let left_response = ui.allocate_ui_with_layout(
-                                    egui::vec2(left_width, fill_height),
-                                    egui::Layout::top_down(egui::Align::Min),
-                                    |ui| {
-                                        ui.set_min_size(egui::vec2(left_width, fill_height));
-                                        EmojiLabel::new(
-                                            egui::RichText::new("📊 Manifest Data").size(16.0),
-                                        )
-                                        .show(ui);
-                                        egui::ScrollArea::vertical()
-                                            .id_salt("manifest_data")
-                                            .show(ui, |ui| {
-                                                // Force content width to match panel so tree fills on init (not only after resize)
-                                                ui.set_min_width((left_width - 16.0).max(0.0));
-                                                JsonTree::new("manifest-data-tree", &manifest.manifest_value)
-                                                    .default_expand(DefaultExpand::ToLevel(2))
-                                                    .show(ui);
-                                            });
-                                    },
-                                );
-
-                                // Resize handle: stable id so drag is tracked across frames; draggable divider
-                                let left_rect = left_response.response.rect;
-                                let resize_rect = egui::Rect::from_min_size(
-                                    left_rect.right_top(),
-                                    egui::vec2(RESIZE_HANDLE_WIDTH, fill_height),
-                                );
-                                let resize_response = ui.push_id("manifest_tree_resize", |ui| {
-                                    ui.allocate_rect(resize_rect, egui::Sense::drag())
-                                })
-                                .inner;
-                                if resize_response.hovered() {
-                                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                                }
-                                if resize_response.dragged() {
-                                    if let Some(pos) = ui.ctx().input(|i| i.pointer.latest_pos()) {
-                                        let panels_left = left_rect.left();
-                                        let new_ratio = (pos.x - panels_left) / content_width;
-                                        self.split_ratio =
-                                            new_ratio.clamp(MIN_PANEL_RATIO, MAX_PANEL_RATIO);
-                                    }
-                                }
-                                // Visible divider line
-                                let painter = ui.painter_at(resize_rect);
-                                let line_x = resize_rect.center().x;
-                                painter.line_segment(
-                                    [
-                                        egui::pos2(line_x, resize_rect.top()),
-                                        egui::pos2(line_x, resize_rect.bottom()),
-                                    ],
-                                    egui::Stroke::new(
-                                        1.0,
-                                        ui.visuals().widgets.noninteractive.fg_stroke.color,
-                                    ),
-                                );
-
-                                // Right: Tree view — claim full right_width so it gets exactly the remaining space
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(right_width, fill_height),
-                                    egui::Layout::top_down(egui::Align::Min),
-                                    |ui| {
-                                        ui.set_min_size(egui::vec2(right_width, fill_height));
-                                        EmojiLabel::new(
-                                            egui::RichText::new("🌳 Manifest & Ingredients Tree")
-                                                .size(16.0),
-                                        )
-                                        .show(ui);
-                                        egui::ScrollArea::vertical()
-                                            .id_salt("tree_view")
-                                            .show(ui, |ui| {
-                                                display_manifest_ingredient_tree(
-                                                    ui,
-                                                    &manifest.manifest_value,
-                                                    &manifest.active_label,
-                                                );
-                                            });
-                                    },
-                                );
-                            });
-                        }
+                        let manifest = manifest.clone();
+                        self.show_manifest_loaded_ui(ui, &manifest);
                     }
                     Err(e) => {
                         EmojiLabel::new(
@@ -1146,6 +1257,56 @@ fn ingredient_node_details(
             );
         }
     }
+}
+
+/// Format an RFC3339 / ISO 8601 timestamp string as "Mon DD, YYYY" (e.g. "Feb 24, 2026").
+fn format_rfc3339_date(s: &str) -> Option<String> {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let date_part = s.split('T').next()?;
+    let mut parts = date_part.split('-');
+    let year: u32 = parts.next()?.parse().ok()?;
+    let month: usize = parts.next()?.parse().ok()?;
+    let day: u32 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || day == 0 || day > 31 {
+        return None;
+    }
+    Some(format!("{} {}, {}", MONTHS[month - 1], day, year))
+}
+
+/// Get "Issued by" name and date from the active manifest's signature (subject CN/O and timestamp).
+/// Returns (name, date_string) for display as "Issued by: {name} on {date}".
+fn get_signature_issued_info(
+    manifest_value: &serde_json::Value,
+    active_label: &str,
+) -> Option<(String, String)> {
+    let active_manifest = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        })?;
+    let sig = active_manifest.get("signature")?.as_object()?;
+    let name = sig
+        .get("subject")
+        .and_then(|s| s.get("CN").or_else(|| s.get("cn")))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            sig.get("subject")
+                .and_then(|s| s.get("O").or_else(|| s.get("o")))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "—".to_string());
+    let date = sig
+        .get("timestamp")
+        .and_then(|v| v.as_str())
+        .and_then(format_rfc3339_date)
+        .unwrap_or_else(|| "—".to_string());
+    Some((name, date))
 }
 
 /// Extract trust status from the active manifest (identified by label, not array index).
