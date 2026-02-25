@@ -16,11 +16,12 @@ All functions return structured data (no `println!` output) making them perfect 
 ### 2. GUI Application (`crtool-gui/`) ✅
 A complete egui-based GUI with:
 - **Native file picker** for selecting image files
-- **Automatic manifest extraction** in JPEG Trust format
-- **Real-time validation** against the indicators schema
+- **Automatic manifest extraction** in crJSON format (Content Credentials)
+- **Trust list validation**: Loads C2PA and Content Credentials trust lists at startup so signing certificate trust status (Trusted/Untrusted) is displayed
+- **Real-time validation** against the crJSON schema
 - **Tree view** of manifest structure with collapsible sections
 - **Raw JSON view** with syntax highlighting
-- **Color-coded validation results** (green for pass, red for fail)
+- **Color-coded validation results and trust status** (green for pass, red for fail)
 - **Detailed error messages** showing JSON paths and descriptions
 
 ### 3. Workspace Structure ✅

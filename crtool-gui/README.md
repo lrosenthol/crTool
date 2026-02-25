@@ -5,8 +5,9 @@ A graphical user interface for extracting and validating C2PA manifests from med
 ## Features
 
 - 📂 **File Selection**: Native file dialogs for easy file selection
-- 🔍 **Manifest Extraction**: Extracts C2PA manifests in JPEG Trust format
-- ✅ **Validation**: Validates extracted manifests against the JPEG Trust indicators schema
+- 🔍 **Manifest Extraction**: Extracts C2PA manifests in crJSON format (Content Credentials)
+- 🔒 **Trust list validation**: Loads the official C2PA trust list and Content Credentials interim trust list at startup so that signing certificate trust status (Trusted / Untrusted) is shown for each manifest
+- ✅ **Validation**: Validates extracted manifests against the crJSON schema (`INTERNAL/schemas/crJSON-schema.json`)
 - 📊 **Visual Display**: 
   - Structured tree view of manifest data
   - Syntax-highlighted raw JSON view
@@ -33,10 +34,10 @@ cargo run --release -p crTool-gui
 4. View the extracted manifest and validation results
 
 The application will:
-- Extract the manifest in JPEG Trust format
-- Compute the asset hash
-- Validate the manifest against the indicators schema
-- Display any validation errors
+- Load the C2PA and Content Credentials trust lists (requires network on first launch) and use them for certificate validation
+- Extract the manifest in crJSON format
+- Validate the manifest against the crJSON schema
+- Display trust status (Trusted/Untrusted) and any validation errors
 - Show the manifest data in a structured tree view
 
 ## Requirements

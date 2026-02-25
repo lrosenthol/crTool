@@ -38,6 +38,7 @@ cargo run --release -p crTool-gui
 3. **View Results**
    - ✓ Green checkmark if manifest is valid
    - ✗ Red X with error details if invalid
+   - **Trust status** (Trusted/Untrusted) from C2PA and Content Credentials trust lists
    - Asset hash and manifest label displayed
    - Tree view of manifest structure
    - Toggle "Show Raw JSON" for the full JSON
@@ -68,11 +69,12 @@ crTool/
 - Native file picker (macOS/Windows/Linux)
 - **Drag and drop**: Drop a supported file onto the window to open it
 - **macOS**: Drop a file onto the **Dock** icon when the app is running, or use **Open With → crTool** in Finder. Dragging onto the app icon in Finder (to launch with a file) may show a system error; launch the app first, then use Dock drop or Open With.
-- Automatic manifest extraction
-- Real-time validation
+- **Trust list validation**: At startup, the GUI loads the official C2PA trust list and Content Credentials interim trust list so that signing certificate trust status (Trusted/Untrusted) is shown for every manifest (requires network on first run).
+- Automatic manifest extraction (crJSON format)
+- Real-time validation against the crJSON schema
 - Collapsible tree view
 - Syntax-highlighted JSON
-- Color-coded validation results
+- Color-coded validation results and trust status
 - Detailed error messages
 
 ## Documentation

@@ -110,7 +110,14 @@ crTool \
   - Includes computed asset hash in `asset_info`
   - Formats manifests as an array instead of an object
   - Different validation status structure compared to standard format
-- `-v, --validate`: Validate JSON files against the JPEG Trust indicators schema
+- `--crjson`: Use crJSON format for extraction (only valid with `--extract`), or use crJSON schema when validating (with `-v/--validate`). Mutually exclusive with `--jpt`
+  - With `--extract`: outputs manifest in Content Credentials crJSON format with `validationResults` (e.g. `signingCredential.trusted` / `signingCredential.untrusted`)
+  - With `--validate`: validates input JSON against `INTERNAL/schemas/crJSON-schema.json`
+- `--trust`: Enable trust list validation for extract/read operations (default: false)
+  - Fetches and applies the official [C2PA trust list](https://github.com/c2pa-org/conformance-public/tree/main/trust-list) and the [Content Credentials interim trust list](https://contentcredentials.org/trust)
+  - When set, extraction uses these lists so output includes trust status (e.g. `signingCredential.trusted` in crJSON)
+  - Requires network access on first run to download the lists
+- `-v, --validate`: Validate JSON files against the JPEG Trust indicators schema (or crJSON schema when `--crjson` is set)
   - Validates one or more JSON files against the schema at `INTERNAL/schemas/indicators-schema.json`
   - Useful for validating extracted manifests or custom indicators documents
   - Provides detailed error messages for validation failures
@@ -259,6 +266,17 @@ You can extract existing C2PA manifests from signed files using the `-e/--extrac
   -e --jpt "output/*.jpg" \
   --output manifests/
 # Creates: manifests/image1_manifest_jpt.json, manifests/image2_manifest_jpt.json, etc.
+
+# Extract in crJSON format (Content Credentials format with validationResults)
+./target/release/crTool \
+  -e --crjson signed_image.jpg \
+  --output output_directory/
+# Creates: output_directory/signed_image_manifest_crjson.json
+
+# Extract with trust list validation (reports signingCredential.trusted / untrusted)
+./target/release/crTool \
+  -e --crjson --trust signed_image.jpg \
+  --output output_directory/
 ```
 
 In extract mode:
@@ -268,9 +286,14 @@ In extract mode:
 - If the output is a directory, the filename is auto-generated as:
   - `{input_stem}_manifest.json` for standard format
   - `{input_stem}_manifest_jpt.json` for JPEG Trust format
+  - `{input_stem}_manifest_crjson.json` for crJSON format
 - The extracted JSON contains the complete manifest store including all assertions, signatures, and metadata
 
-**JPEG Trust Format**:
+**crJSON format** (`--crjson` with `--extract`):
+- Outputs Content Credentials crJSON with `@context`, `manifests`, and `validationResults`
+- Use `--trust` to validate signing certificates against the C2PA and Content Credentials trust lists; output will include `signingCredential.trusted` or `signingCredential.untrusted` in `validationResults`
+
+**JPEG Trust Format** (`--jpt`):
 - Use the `--jpt` flag to extract in JPEG Trust format
 - This format follows the JPEG Trust specification with:
   - `@context` field with JPEG Trust vocabulary reference
@@ -299,12 +322,16 @@ The tool can validate JSON files against the JPEG Trust indicators schema. This 
 # Validate using glob patterns
 ./target/release/crTool \
   --validate "manifests/*.json"
+
+# Validate against crJSON schema instead of indicators schema
+./target/release/crTool \
+  --validate --crjson manifest_crjson.json
 ```
 
 In validation mode:
 - No `--output` flag is required (validation doesn't produce any files)
-- The tool loads the indicators schema from `INTERNAL/schemas/indicators-schema.json`
-- Each input file is validated against the schema
+- By default the tool loads the indicators schema from `INTERNAL/schemas/indicators-schema.json`; use `--crjson` to validate against `INTERNAL/schemas/crJSON-schema.json` instead
+- Each input file is validated against the chosen schema
 - Detailed error messages are provided for validation failures, including:
   - The path in the JSON where the error occurred
   - A description of what is invalid

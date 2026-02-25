@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 #![allow(unexpected_cfgs)]
 
 use crtool::{
-    apply_trust_settings, default_schema_path, extract_crjson_manifest, validate_json_value,
+    apply_trust_settings, crjson_schema_path, extract_crjson_manifest, validate_json_value,
     ManifestExtractionResult, ValidationResult, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
     INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
 };
@@ -171,7 +171,7 @@ impl CrtoolApp {
             validation_result: None,
             show_raw_json: false,
             raw_json_buffer: String::new(),
-            schema_path: default_schema_path(),
+            schema_path: crjson_schema_path(),
             split_ratio: 0.5,
         };
         if app.selected_file.is_some() {

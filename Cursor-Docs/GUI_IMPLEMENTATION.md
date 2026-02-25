@@ -63,8 +63,9 @@ Built with **egui**, a pure Rust immediate-mode GUI framework.
    - Filters for image formats (JPEG, PNG, WebP)
 
 2. **Manifest Extraction**
-   - Automatic extraction on file selection
+   - Automatic extraction on file selection in crJSON format (Content Credentials)
    - Display of active manifest label and asset hash
+   - At startup, loads the C2PA and Content Credentials trust lists so that signing certificate trust status (Trusted/Untrusted) is shown
 
 3. **Validation Display**
    - Color-coded validation status
