@@ -57,6 +57,7 @@ pub fn install_handler() {
 }
 
 /// Take one pending file path if any (from drop-on-icon / Open With). Call at startup.
+#[allow(dead_code)] // Prefer drain_pending_files for multi-file startup
 pub fn take_pending_file() -> Option<PathBuf> {
     PENDING_FILES.lock().ok().and_then(|mut g| {
         if g.is_empty() {
