@@ -15,11 +15,63 @@ governing permissions and limitations under the License.
 use crate::document::{self, DocumentTab};
 use crate::tab_viewer::CrtoolTabViewer;
 use crate::util;
-use crtool::{crjson_schema_path, is_supported_asset_path};
+use crtool::{crjson_schema_path, is_supported_asset_path, ManifestExtractionResult};
 use eframe::egui;
 use egui_dock::{DockArea, DockState, Style};
 use egui_twemoji::EmojiLabel;
 use std::path::PathBuf;
+
+/// Run Save As dialog and write manifest JSON; returns true if user picked a path (and write succeeded or we tried).
+fn save_manifest_as(tab: &DocumentTab, manifest: &ManifestExtractionResult) -> bool {
+    let default_name = tab
+        .file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| format!("{}-indicators.json", s))
+        .unwrap_or_else(|| "manifest-indicators.json".to_string());
+    if let Some(save_path) = rfd::FileDialog::new()
+        .set_file_name(&default_name)
+        .add_filter("JSON", &["json"])
+        .save_file()
+    {
+        if let Err(e) = std::fs::write(&save_path, &manifest.manifest_json) {
+            eprintln!("Failed to save file: {}", e);
+        }
+        true
+    } else {
+        false
+    }
+}
+
+/// Keyboard shortcuts for menu actions (Cmd on macOS, Ctrl on Windows/Linux).
+mod shortcuts {
+    use egui::{Key, KeyboardShortcut, Modifiers};
+
+    pub const OPEN: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND,
+        logical_key: Key::O,
+    };
+    pub const CLOSE: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND,
+        logical_key: Key::W,
+    };
+    pub const CLOSE_ALL: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND.plus(Modifiers::SHIFT),
+        logical_key: Key::W,
+    };
+    pub const SAVE_AS: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND.plus(Modifiers::SHIFT),
+        logical_key: Key::S,
+    };
+    pub const COPY: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND,
+        logical_key: Key::C,
+    };
+    pub const SELECT_ALL: KeyboardShortcut = KeyboardShortcut {
+        modifiers: Modifiers::COMMAND,
+        logical_key: Key::A,
+    };
+}
 
 /// Main app state: multi-document dock and schema path.
 pub(crate) struct CrtoolApp {
@@ -102,10 +154,70 @@ impl eframe::App for CrtoolApp {
             self.add_documents(paths_to_open);
         }
 
+        // Handle keyboard shortcuts (check more specific before less specific).
+        // We avoid calling ctx inside input_mut to prevent deadlock; copy is deferred.
+        let mut trigger_copy = false;
+        ctx.input_mut(|i| {
+            if i.consume_shortcut(&shortcuts::OPEN) {
+                if let Some(paths) = rfd::FileDialog::new()
+                    .add_filter("C2PA-supported files", crtool::SUPPORTED_ASSET_EXTENSIONS)
+                    .pick_files()
+                {
+                    self.add_documents(paths);
+                }
+            }
+            if i.consume_shortcut(&shortcuts::CLOSE_ALL) {
+                self.dock_state.retain_tabs(|_| false);
+            } else if i.consume_shortcut(&shortcuts::CLOSE) {
+                if let Some(loc) = self.focused_tab_location() {
+                    self.dock_state.remove_tab(loc);
+                }
+            }
+            if i.consume_shortcut(&shortcuts::SAVE_AS) {
+                if let Some((_, tab)) = self.dock_state.find_active_focused() {
+                    if let Ok(ref manifest) = tab.extraction_result {
+                        let default_name = tab
+                            .file_path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| format!("{}-indicators.json", s))
+                            .unwrap_or_else(|| "manifest-indicators.json".to_string());
+                        if let Some(save_path) = rfd::FileDialog::new()
+                            .set_file_name(&default_name)
+                            .add_filter("JSON", &["json"])
+                            .save_file()
+                        {
+                            if let Err(e) = std::fs::write(&save_path, &manifest.manifest_json) {
+                                eprintln!("Failed to save file: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            if i.consume_shortcut(&shortcuts::COPY) {
+                trigger_copy = true;
+            }
+            // Select All: consumed for consistency; no-op (egui handles text selection where applicable)
+            let _ = i.consume_shortcut(&shortcuts::SELECT_ALL);
+        });
+        if trigger_copy {
+            ctx.copy_text(util::get_selected_text(ctx));
+        }
+
+        let open_shortcut = ctx.format_shortcut(&shortcuts::OPEN);
+        let close_shortcut = ctx.format_shortcut(&shortcuts::CLOSE);
+        let close_all_shortcut = ctx.format_shortcut(&shortcuts::CLOSE_ALL);
+        let save_as_shortcut = ctx.format_shortcut(&shortcuts::SAVE_AS);
+        let copy_shortcut = ctx.format_shortcut(&shortcuts::COPY);
+        let select_all_shortcut = ctx.format_shortcut(&shortcuts::SELECT_ALL);
+
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("📂 Open...").clicked() {
+                    if ui
+                        .button(format!("📂 Open...\t{}", open_shortcut))
+                        .clicked()
+                    {
                         if let Some(paths) = rfd::FileDialog::new()
                             .add_filter("C2PA-supported files", crtool::SUPPORTED_ASSET_EXTENSIONS)
                             .pick_files()
@@ -118,9 +230,11 @@ impl eframe::App for CrtoolApp {
                     let has_tabs = self.dock_state.iter_all_tabs().next().is_some();
                     let focused = self.focused_tab_location();
 
-                    ui.add_enabled_ui(focused.is_some(), |ui| {
-                        if ui.button("❌ Close").clicked() {
-                            if let Some(loc) = focused {
+                    // Close: enabled when any tab exists; close focused tab or first tab
+                    ui.add_enabled_ui(has_tabs, |ui| {
+                        if ui.button(format!("❌ Close\t{}", close_shortcut)).clicked() {
+                            let loc = focused.or_else(|| self.dock_state.find_tab_from(|_| true));
+                            if let Some(loc) = loc {
                                 self.dock_state.remove_tab(loc);
                             }
                             ui.close();
@@ -128,7 +242,10 @@ impl eframe::App for CrtoolApp {
                     });
 
                     ui.add_enabled_ui(has_tabs, |ui| {
-                        if ui.button("❌ Close All").clicked() {
+                        if ui
+                            .button(format!("❌ Close All\t{}", close_all_shortcut))
+                            .clicked()
+                        {
                             self.dock_state.retain_tabs(|_| false);
                             ui.close();
                         }
@@ -136,26 +253,23 @@ impl eframe::App for CrtoolApp {
 
                     ui.separator();
 
-                    ui.add_enabled_ui(focused.is_some(), |ui| {
-                        if ui.button("💾 Save As...").clicked() {
+                    // Save As: enabled when any tab exists; save focused tab or first tab
+                    ui.add_enabled_ui(has_tabs, |ui| {
+                        if ui
+                            .button(format!("💾 Save As...\t{}", save_as_shortcut))
+                            .clicked()
+                        {
+                            let mut did_save = false;
                             if let Some((_, tab)) = self.dock_state.find_active_focused() {
                                 if let Ok(ref manifest) = tab.extraction_result {
-                                    let default_name = tab
-                                        .file_path
-                                        .file_stem()
-                                        .and_then(|s| s.to_str())
-                                        .map(|s| format!("{}-indicators.json", s))
-                                        .unwrap_or_else(|| "manifest-indicators.json".to_string());
-                                    if let Some(save_path) = rfd::FileDialog::new()
-                                        .set_file_name(&default_name)
-                                        .add_filter("JSON", &["json"])
-                                        .save_file()
-                                    {
-                                        if let Err(e) =
-                                            std::fs::write(&save_path, &manifest.manifest_json)
-                                        {
-                                            eprintln!("Failed to save file: {}", e);
-                                        }
+                                    did_save = save_manifest_as(tab, manifest);
+                                }
+                            }
+                            if !did_save {
+                                for (_, tab) in self.dock_state.iter_all_tabs_mut() {
+                                    if let Ok(ref manifest) = tab.extraction_result {
+                                        save_manifest_as(tab, manifest);
+                                        break;
                                     }
                                 }
                             }
@@ -165,12 +279,15 @@ impl eframe::App for CrtoolApp {
                 });
 
                 ui.menu_button("Edit", |ui| {
-                    if ui.button("📋 Copy").clicked() {
+                    if ui.button(format!("📋 Copy\t{}", copy_shortcut)).clicked() {
                         ctx.copy_text(util::get_selected_text(ctx));
                         ui.close();
                     }
                     ui.separator();
-                    if ui.button("Select All").clicked() {
+                    if ui
+                        .button(format!("Select All\t{}", select_all_shortcut))
+                        .clicked()
+                    {
                         ui.close();
                     }
                 });
