@@ -123,6 +123,84 @@ pub(crate) fn get_trust_status(
         .map(|s| s.to_string())
 }
 
+/// One validation failure entry from validationResults (code + optional url/explanation).
+#[derive(Clone, Debug)]
+pub(crate) struct ValidationFailureEntry {
+    pub(crate) code: String,
+    pub(crate) explanation: Option<String>,
+    pub(crate) url: Option<String>,
+    /// When from ingredientDeltas, e.g. "Ingredient: …"
+    pub(crate) source: Option<String>,
+}
+
+/// Collect all validation failure entries from validationResults (activeManifest.failure and
+/// ingredientDeltas[].validationDeltas.failure), excluding signingCredential.untrusted (shown
+/// elsewhere as trust status).
+pub(crate) fn get_validation_failures(
+    manifest_value: &serde_json::Value,
+) -> Vec<ValidationFailureEntry> {
+    const UNTRUSTED_CODE: &str = "signingCredential.untrusted";
+
+    let mut out = Vec::new();
+    let vr = match manifest_value
+        .get("validationResults")
+        .and_then(|v| v.as_object())
+    {
+        Some(o) => o,
+        None => return out,
+    };
+
+    let push_entries = |out: &mut Vec<ValidationFailureEntry>,
+                        arr: Option<&serde_json::Value>,
+                        source: Option<String>| {
+        let arr = match arr.and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+        for entry in arr {
+            let obj = match entry.as_object() {
+                Some(o) => o,
+                None => continue,
+            };
+            let code = match obj.get("code").and_then(|v| v.as_str()) {
+                Some(c) => c,
+                None => continue,
+            };
+            if code == UNTRUSTED_CODE {
+                continue;
+            }
+            out.push(ValidationFailureEntry {
+                code: code.to_string(),
+                explanation: obj
+                    .get("explanation")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                url: obj.get("url").and_then(|v| v.as_str()).map(String::from),
+                source: source.clone(),
+            });
+        }
+    };
+
+    if let Some(am) = vr.get("activeManifest").and_then(|v| v.as_object()) {
+        push_entries(&mut out, am.get("failure"), None);
+    }
+
+    if let Some(deltas) = vr.get("ingredientDeltas").and_then(|v| v.as_array()) {
+        for delta in deltas {
+            let uri = delta
+                .get("ingredientAssertionURI")
+                .and_then(|v| v.as_str())
+                .map(|s| format!("Ingredient: {}", s));
+            let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
+            if let Some(vd) = vd {
+                push_entries(&mut out, vd.get("failure"), uri);
+            }
+        }
+    }
+
+    out
+}
+
 /// Recursively display manifest → ingredients tree in the given UI.
 pub(crate) fn display_manifest_ingredient_tree(
     ui: &mut egui::Ui,
@@ -183,28 +261,28 @@ pub(crate) fn display_manifest_ingredient_tree(
             ui.label(
                 egui::RichText::new(format!("Claim type: {}", ct))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(128, 128, 128)),
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         }
         if let Some(ref gen) = claim_gen {
             ui.label(
                 egui::RichText::new(format!("Claim generator: {}", gen))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(128, 128, 128)),
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         }
         if let Some(ref info) = claim_gen_info {
             ui.label(
                 egui::RichText::new(format!("Claim generator info: {}", info))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(128, 128, 128)),
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         }
         if let Some(label) = active_manifest.get("label").and_then(|v| v.as_str()) {
             ui.label(
                 egui::RichText::new(format!("Label: {}", label))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(128, 128, 128)),
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         }
         let ingredients = collect_ingredients_from_manifest(active_manifest);
@@ -212,7 +290,7 @@ pub(crate) fn display_manifest_ingredient_tree(
             ui.label(
                 egui::RichText::new(format!("Digital source type: {}", dst))
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(128, 128, 128)),
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         } else {
             for ing in &ingredients {
@@ -224,7 +302,7 @@ pub(crate) fn display_manifest_ingredient_tree(
                                 dst
                             ))
                             .size(12.0)
-                            .color(egui::Color32::from_rgb(128, 128, 128)),
+                            .color(egui::Color32::from_rgb(64, 64, 64)),
                         );
                         break;
                     }
@@ -233,9 +311,9 @@ pub(crate) fn display_manifest_ingredient_tree(
         }
         if let Some(trust) = trust_status_from_manifest(active_manifest) {
             let (icon, color) = match trust.as_str() {
-                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
+                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(0, 100, 0)),
                 "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
-                _ => ("", egui::Color32::from_rgb(128, 128, 128)),
+                _ => ("", egui::Color32::from_rgb(64, 64, 64)),
             };
             let text = if icon.is_empty() {
                 format!("Trust: {}", trust)
@@ -519,7 +597,7 @@ fn render_ingredient_node(
         "parentOf" => egui::Color32::from_rgb(100, 180, 255),
         "componentOf" => egui::Color32::from_rgb(120, 220, 120),
         "inputOf" => egui::Color32::from_rgb(255, 200, 100),
-        _ => egui::Color32::from_rgb(128, 128, 128),
+        _ => egui::Color32::from_rgb(64, 64, 64),
     };
 
     let nested_manifest = nested_manifest_for_ingredient(manifest_value, ingredient);
@@ -562,7 +640,7 @@ fn ingredient_node_details(
     manifest_value: &serde_json::Value,
     ingredient: &serde_json::Value,
 ) {
-    let gray = egui::Color32::from_rgb(128, 128, 128);
+    let gray = egui::Color32::from_rgb(64, 64, 64);
     let small = 12.0f32;
     if let Some(s) = ingredient
         .get("title")
@@ -654,7 +732,7 @@ fn ingredient_node_details(
         }
         if let Some(trust) = trust_status_from_manifest(nested) {
             let (icon, color) = match trust.as_str() {
-                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(80, 220, 120)),
+                "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(0, 100, 0)),
                 "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
                 _ => ("", gray),
             };
