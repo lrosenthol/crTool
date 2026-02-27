@@ -4,11 +4,16 @@ A graphical user interface for extracting and validating C2PA manifests from med
 
 ## Features
 
-- 📂 **File Selection**: Native file dialogs for easy file selection
+- 📂 **Multi-document**: Open multiple C2PA files at once; each document has its own tab.
+- 📑 **Dockable tabs**: Tabs can be moved, split, and **undocked into separate windows** (egui_dock).
+- 📥 **Open multiple files** via:
+  - **File → Open...**: Multi-select in the file dialog
+  - **Drag & drop** onto the main window (all dropped files are opened)
+  - **macOS**: Drop on app icon or “Open With” (all files are opened)
 - 🔍 **Manifest Extraction**: Extracts C2PA manifests in crJSON format (Content Credentials)
 - 🔒 **Trust list validation**: Loads the official C2PA trust list and Content Credentials interim trust list at startup so that signing certificate trust status (Trusted / Untrusted) is shown for each manifest
 - ✅ **Validation**: Validates extracted manifests against the crJSON schema (`INTERNAL/schemas/crJSON-schema.json`)
-- 📊 **Visual Display**: 
+- 📊 **Visual Display**:
   - Structured tree view of manifest data
   - Syntax-highlighted raw JSON view
   - Clear validation error messages
@@ -28,10 +33,12 @@ cargo run --release -p crTool-gui
 
 ## Usage
 
-1. Launch the application
-2. Click "📂 Select Image File"
-3. Choose an image file with a C2PA manifest (JPEG, PNG, WebP)
-4. View the extracted manifest and validation results
+1. Launch the application.
+2. Open one or more files:
+   - Click **“📂 Select File(s)...”** (or **File → Open...**) and choose one or more C2PA-supported files, or
+   - Drag and drop files onto the window, or (on macOS) onto the app icon.
+3. Each file opens in its own tab; you can drag tabs to reorder, split the view, or use the tab context menu to **“Move tab to new window”** to undock.
+4. Use **File → Close** to close the active tab, **Close All** to close all documents, and **Save As...** to export the active tab’s manifest as JSON.
 
 The application will:
 - Load the C2PA and Content Credentials trust lists (requires network on first launch) and use them for certificate validation
@@ -51,7 +58,8 @@ The application will:
 The GUI is built using:
 - **egui**: Immediate mode GUI framework
 - **eframe**: Native window framework for egui
-- **rfd**: Native file dialogs
+- **egui_dock**: Multi-document tabs with undockable windows
+- **rfd**: Native file dialogs (multi-file open supported)
 - **crtool**: Core library for manifest extraction and validation
 
 ## Cross-Platform Support
