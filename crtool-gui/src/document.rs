@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 
 use crate::manifest_ui::{
     display_manifest_ingredient_tree, get_generator_name, get_signature_issued_info,
-    get_trust_status,
+    get_trust_status, get_validation_failures, ValidationFailureEntry,
 };
 use crate::util;
 use crtool::{
@@ -89,6 +89,42 @@ pub(crate) fn load_document(file_path: PathBuf, schema_path: &Path) -> DocumentT
     }
 }
 
+/// Renders one validation failure entry (code, optional explanation, url, source).
+fn show_validation_failure_entry(ui: &mut egui::Ui, entry: &ValidationFailureEntry) {
+    ui.group(|ui| {
+        if let Some(ref source) = entry.source {
+            EmojiLabel::new(
+                egui::RichText::new(format!("📍 {}", source))
+                    .size(14.0)
+                    .color(egui::Color32::from_rgb(255, 200, 100)),
+            )
+            .show(ui);
+        }
+        EmojiLabel::new(
+            egui::RichText::new(format!("❌ Code: {}", entry.code))
+                .size(14.0)
+                .color(egui::Color32::from_rgb(255, 150, 150)),
+        )
+        .show(ui);
+        if let Some(ref explanation) = entry.explanation {
+            EmojiLabel::new(
+                egui::RichText::new(format!("   {}", explanation))
+                    .size(14.0)
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
+            )
+            .show(ui);
+        }
+        if let Some(ref url) = entry.url {
+            EmojiLabel::new(
+                egui::RichText::new(format!("   URL: {}", url))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(64, 64, 64)),
+            )
+            .show(ui);
+        }
+    });
+}
+
 /// Renders one document tab: manifest info, validation, raw JSON toggle, and manifest/tree panels.
 pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
     let manifest = match &tab.extraction_result {
@@ -104,7 +140,7 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
         }
     };
 
-    EmojiLabel::new(egui::RichText::new("✅ Manifest Extracted Successfully").size(18.0)).show(ui);
+    // EmojiLabel::new(egui::RichText::new("✅ Manifest Extracted Successfully").size(18.0)).show(ui);
 
     ui.horizontal(|ui| {
         EmojiLabel::new(
@@ -141,14 +177,14 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
         ui.horizontal(|ui| {
             let (icon, color, text) = match trust_status.as_str() {
                 "signingCredential.trusted" => {
-                    ("🔒", egui::Color32::from_rgb(80, 220, 120), "Trusted")
+                    ("🔒", egui::Color32::from_rgb(0, 100, 0), "Trusted")
                 }
                 "signingCredential.untrusted" => {
                     ("🚫", egui::Color32::from_rgb(255, 100, 100), "Untrusted")
                 }
                 _ => (
                     "⚠️",
-                    egui::Color32::from_rgb(128, 128, 128),
+                    egui::Color32::from_rgb(64, 64, 64),
                     trust_status.as_str(),
                 ),
             };
@@ -164,21 +200,23 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
     ui.separator();
 
     if let Some(ref validation) = tab.validation_result {
-        if validation.is_valid {
+        let manifest_failures = get_validation_failures(&manifest.manifest_value);
+        let has_schema_errors = !validation.errors.is_empty();
+        let has_manifest_failures = !manifest_failures.is_empty();
+
+        if validation.is_valid && !has_manifest_failures {
             EmojiLabel::new(
-                egui::RichText::new("✅ Manifest is valid according to JPEG Trust schema")
+                egui::RichText::new("✅ Manifest is valid!")
                     .size(15.0)
-                    .color(egui::Color32::from_rgb(80, 220, 120)),
+                    .color(egui::Color32::from_rgb(0, 100, 0)),
             )
             .show(ui);
         } else {
+            let total_errors = validation.errors.len() + manifest_failures.len();
             EmojiLabel::new(
-                egui::RichText::new(format!(
-                    "❌ Validation failed ({} error(s))",
-                    validation.errors.len()
-                ))
-                .size(15.0)
-                .color(egui::Color32::from_rgb(255, 100, 100)),
+                egui::RichText::new(format!("❌ Validation failed ({} error(s))", total_errors))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(255, 100, 100)),
             )
             .show(ui);
 
@@ -188,23 +226,45 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
                 .id_salt("validation_errors")
                 .max_height(200.0)
                 .show(ui, |ui| {
-                    EmojiLabel::new(egui::RichText::new("⚠️  Validation Errors:").size(16.0))
+                    if has_schema_errors {
+                        EmojiLabel::new(
+                            egui::RichText::new("⚠️  Schema validation errors:").size(16.0),
+                        )
                         .show(ui);
-                    for error in &validation.errors {
-                        ui.group(|ui| {
-                            EmojiLabel::new(
-                                egui::RichText::new(format!("📍 Path: {}", error.instance_path))
+                        for error in &validation.errors {
+                            ui.group(|ui| {
+                                EmojiLabel::new(
+                                    egui::RichText::new(format!(
+                                        "📍 Path: {}",
+                                        error.instance_path
+                                    ))
                                     .size(14.0)
                                     .color(egui::Color32::from_rgb(255, 200, 100)),
+                                )
+                                .show(ui);
+                                EmojiLabel::new(
+                                    egui::RichText::new(format!("❌ Error: {}", error.message))
+                                        .size(14.0)
+                                        .color(egui::Color32::from_rgb(255, 150, 150)),
+                                )
+                                .show(ui);
+                            });
+                        }
+                        if has_manifest_failures {
+                            ui.add_space(8.0);
+                        }
+                    }
+                    if has_manifest_failures {
+                        EmojiLabel::new(
+                            egui::RichText::new(
+                                "⚠️ Manifest validation failures (validationResults):",
                             )
-                            .show(ui);
-                            EmojiLabel::new(
-                                egui::RichText::new(format!("❌ Error: {}", error.message))
-                                    .size(14.0)
-                                    .color(egui::Color32::from_rgb(255, 150, 150)),
-                            )
-                            .show(ui);
-                        });
+                            .size(16.0),
+                        )
+                        .show(ui);
+                        for entry in &manifest_failures {
+                            show_validation_failure_entry(ui, entry);
+                        }
                     }
                 });
         }
@@ -215,7 +275,7 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
     ui.horizontal(|ui| {
         ui.checkbox(&mut tab.show_raw_json, "");
         EmojiLabel::new(
-            egui::RichText::new("📄 Show Raw JSON (replaces tree and manifest data)").size(15.0),
+            egui::RichText::new("Show Raw JSON (replaces tree and manifest data)").size(15.0),
         )
         .show(ui);
     });
