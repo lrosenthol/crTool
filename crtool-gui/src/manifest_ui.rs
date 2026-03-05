@@ -63,6 +63,9 @@ pub(crate) fn get_generator_name(
 }
 
 /// Get "Issued by" name and date from the active manifest's signature.
+/// Subject is read from `signature.certificateInfo.subject` (new schema); falls back to
+/// `signature.subject` for older crJSON. Date is from `signature.timeStampInfo.timestamp`
+/// (new schema); falls back to top-level `signature.timestamp` for older crJSON.
 pub(crate) fn get_signature_issued_info(
     manifest_value: &serde_json::Value,
     active_label: &str,
@@ -75,24 +78,68 @@ pub(crate) fn get_signature_issued_info(
                 .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
         })?;
     let sig = active_manifest.get("signature")?.as_object()?;
-    let name = sig
-        .get("subject")
+    let subject = sig
+        .get("certificateInfo")
+        .and_then(|ci| ci.get("subject"))
+        .or_else(|| sig.get("subject"));
+    let name = subject
         .and_then(|s| s.get("CN").or_else(|| s.get("cn")))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .or_else(|| {
-            sig.get("subject")
+            subject
                 .and_then(|s| s.get("O").or_else(|| s.get("o")))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string())
         })
         .unwrap_or_else(|| "—".to_string());
     let date = sig
-        .get("timestamp")
+        .get("timeStampInfo")
+        .and_then(|ts| ts.get("timestamp"))
+        .or_else(|| sig.get("timestamp"))
         .and_then(|v| v.as_str())
         .and_then(format_rfc3339_date)
         .unwrap_or_else(|| "—".to_string());
     Some((name, date))
+}
+
+/// Get timestamp presence and TSA certificate authority name from the active manifest's signature.
+/// Returns (timestamp_present, tsa_authority_name). When `signature.timeStampInfo` exists,
+/// the authority name is taken from `timeStampInfo.certificateInfo.issuer` (CN or O).
+pub(crate) fn get_timestamp_info(
+    manifest_value: &serde_json::Value,
+    active_label: &str,
+) -> (bool, Option<String>) {
+    let sig = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        })
+        .and_then(|m| m.get("signature"))
+        .and_then(|s| s.as_object());
+    let Some(sig) = sig else {
+        return (false, None);
+    };
+    let ts_info = match sig.get("timeStampInfo").and_then(|t| t.as_object()) {
+        Some(t) => t,
+        None => return (false, None),
+    };
+    let issuer = ts_info
+        .get("certificateInfo")
+        .and_then(|ci| ci.get("issuer"));
+    let name = issuer
+        .and_then(|s| s.get("CN").or_else(|| s.get("cn")))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            issuer
+                .and_then(|s| s.get("O").or_else(|| s.get("o")))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+    (true, name)
 }
 
 /// Extract trust status from the active manifest (identified by label).

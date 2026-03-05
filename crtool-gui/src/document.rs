@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 
 use crate::manifest_ui::{
     display_manifest_ingredient_tree, get_generator_name, get_signature_issued_info,
-    get_trust_status, get_validation_failures, ValidationFailureEntry,
+    get_timestamp_info, get_trust_status, get_validation_failures, ValidationFailureEntry,
 };
 use crate::util;
 use crtool::{
@@ -156,6 +156,23 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
     ui.horizontal(|ui| {
         EmojiLabel::new(
             egui::RichText::new(format!("📝 Issued by: {} on {}", name, date))
+                .size(15.0)
+                .color(egui::Color32::from_rgb(100, 120, 140)),
+        )
+        .show(ui);
+    });
+
+    let (timestamp_present, tsa_authority) =
+        get_timestamp_info(&manifest.manifest_value, &manifest.active_label);
+    let timestamp_text = if timestamp_present {
+        let ca = tsa_authority.as_deref().unwrap_or("—");
+        format!("🕐 Timestamp: Yes — {}", ca)
+    } else {
+        "🕐 Timestamp: No".to_string()
+    };
+    ui.horizontal(|ui| {
+        EmojiLabel::new(
+            egui::RichText::new(timestamp_text)
                 .size(15.0)
                 .color(egui::Color32::from_rgb(100, 120, 140)),
         )
