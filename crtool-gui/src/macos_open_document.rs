@@ -56,18 +56,6 @@ pub fn install_handler() {
     }
 }
 
-/// Take one pending file path if any (from drop-on-icon / Open With). Call at startup.
-#[allow(dead_code)] // Prefer drain_pending_files for multi-file startup
-pub fn take_pending_file() -> Option<PathBuf> {
-    PENDING_FILES.lock().ok().and_then(|mut g| {
-        if g.is_empty() {
-            None
-        } else {
-            Some(g.remove(0))
-        }
-    })
-}
-
 /// Called from update() to drain any files opened while the app was running (e.g. second drop).
 pub fn drain_pending_files() -> Vec<PathBuf> {
     PENDING_FILES

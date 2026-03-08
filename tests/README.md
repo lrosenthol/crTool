@@ -1,10 +1,10 @@
-# Content Credential Tool - Tests (Updated for c2pa v0.74)
+# Content Credential Tool - Tests
 
 ## Overview
 
 Integration tests for the Content Credential Tool. Tests verify that manifests can be embedded into various image formats (JPEG, PNG, WEBP) using different manifest configurations.
 
-## ✅ Working with c2pa v0.74 (Local Development)
+## ✅ Working with c2pa (Local Development)
 
 **The tests now work perfectly with self-signed certificates!**
 
@@ -131,7 +131,7 @@ c2pa = { path = "../c2pa-rs/sdk", features = ["file_io"] }
 ```
 
 This gives us:
-- ✅ Latest c2pa features (v0.74.0)
+- ✅ Latest c2pa features from your local checkout
 - ✅ Access to test infrastructure
 - ✅ Same certificates as c2patool
 - ✅ No certificate validation issues
@@ -142,7 +142,7 @@ To use the published c2pa crate instead:
 
 ```toml
 [dependencies]
-c2pa = { version = "0.74", features = ["file_io"] }
+c2pa = { version = "0.75", features = ["file_io"] }
 ```
 
 Note: You'll need to provide your own test certificates if using the published version.

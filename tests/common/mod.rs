@@ -10,6 +10,9 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+// Shared test helpers are used by different test binaries; not every binary uses every helper.
+#![allow(dead_code)]
+
 use anyhow::Result;
 #[cfg(feature = "jpeg_trust")]
 use c2pa::JpegTrustReader;
@@ -59,13 +62,11 @@ pub fn manifests_dir() -> PathBuf {
 }
 
 /// Test helper to get the path to testset
-#[allow(dead_code)]
 pub fn testset_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testset")
 }
 
 /// Test helper to create output directory for test artifacts
-#[allow(dead_code)]
 pub fn output_dir() -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_output");
     fs::create_dir_all(&dir).expect("Failed to create test output directory");
@@ -152,7 +153,6 @@ fn add_manifest_resources_from_dir(
 }
 
 /// Helper function to sign a file with a manifest
-#[allow(dead_code)]
 pub fn sign_file_with_manifest(
     input_path: &Path,
     output_path: &Path,
@@ -189,7 +189,6 @@ pub fn sign_file_with_manifest(
 
 /// Helper function to sign a file with a manifest that includes file-based ingredients
 /// This processes ingredients with file_path fields
-#[allow(dead_code)]
 pub fn sign_file_with_manifest_and_ingredients(
     input_path: &Path,
     output_path: &Path,
@@ -205,7 +204,6 @@ pub fn sign_file_with_manifest_and_ingredients(
         false,
     )
 }
-#[allow(dead_code)]
 pub fn sign_file_with_manifest_and_options(
     input_path: &Path,
     output_path: &Path,
@@ -225,7 +223,6 @@ pub fn sign_file_with_manifest_and_options(
 }
 
 /// Internal implementation for signing files with ingredients and thumbnails
-#[allow(dead_code)]
 fn sign_file_with_manifest_and_ingredients_impl(
     input_path: &Path,
     output_path: &Path,
@@ -286,7 +283,6 @@ fn sign_file_with_manifest_and_ingredients_impl(
 }
 
 /// Process ingredients from manifest JSON and add them to the builder with optional thumbnails
-#[allow(dead_code)]
 fn process_ingredients_with_thumbnails(
     builder: &mut Builder,
     manifest_json: &str,
@@ -392,7 +388,6 @@ fn process_ingredients_with_thumbnails(
 }
 
 /// Converts a file extension to a MIME type
-#[allow(dead_code)]
 fn extension_to_mime(extension: &str) -> Option<&'static str> {
     Some(match extension.to_lowercase().as_str() {
         "jpg" | "jpeg" => "image/jpeg",
@@ -407,7 +402,6 @@ fn extension_to_mime(extension: &str) -> Option<&'static str> {
 
 /// Generate a thumbnail from an image stream
 /// Returns (format, thumbnail_bytes)
-#[allow(dead_code)]
 fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(String, Vec<u8>)> {
     use image::ImageFormat;
     use std::io::{BufReader, Cursor};
@@ -469,7 +463,6 @@ fn ed_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 }
 
 /// Helper function to verify a signed file has a valid manifest
-#[allow(dead_code)]
 pub fn verify_signed_file(file_path: &Path) -> Result<Reader> {
     let reader = Reader::from_file(file_path)?;
 
@@ -494,7 +487,6 @@ pub fn get_test_images() -> Vec<PathBuf> {
 
 /// Check if a manifest has an asset thumbnail assertion
 /// Note: Asset thumbnails are stored in the manifest JSON, not necessarily as assertions
-#[allow(dead_code)]
 pub fn has_asset_thumbnail(reader: &Reader, manifest_label: &str) -> bool {
     if let Some(manifest) = reader.get_manifest(manifest_label) {
         // Check the manifest JSON for thumbnail references
@@ -530,7 +522,6 @@ pub fn has_asset_thumbnail(reader: &Reader, manifest_label: &str) -> bool {
 }
 
 /// Check if any ingredients have thumbnails
-#[allow(dead_code)]
 pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool {
     if let Some(manifest) = reader.get_manifest(manifest_label) {
         let ingredients = manifest.ingredients();
@@ -541,19 +532,16 @@ pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool 
 }
 
 /// Helper function to extract manifest from a signed file
-#[allow(dead_code)]
 pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result<()> {
     extract_manifest_impl(input_path, output_path, false)
 }
 
 /// Helper function to extract manifest from a signed file in JPEG Trust format
-#[allow(dead_code)]
 pub fn extract_manifest_to_file_jpt(input_path: &Path, output_path: &Path) -> Result<()> {
     extract_manifest_impl(input_path, output_path, true)
 }
 
 /// Helper function to extract manifest from a signed file in crJSON format (CrJsonReader).
-#[allow(dead_code)]
 pub fn extract_manifest_to_file_crjson(input_path: &Path, output_path: &Path) -> Result<()> {
     if output_path.exists() {
         fs::remove_file(output_path)?;

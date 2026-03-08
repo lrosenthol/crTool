@@ -140,8 +140,6 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
         }
     };
 
-    // EmojiLabel::new(egui::RichText::new("✅ Manifest Extracted Successfully").size(18.0)).show(ui);
-
     ui.horizontal(|ui| {
         EmojiLabel::new(
             egui::RichText::new(format!("📜 Active Manifest: {}", manifest.active_label))
