@@ -5,7 +5,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "simple w/JPG",
+            "name": "Sign: simple w/JPG",
             "cargo": {
                 "args": [
                     "build",
@@ -20,22 +20,21 @@
             "args": [
                 "-m",
                 "examples/simple_manifest.json",
-                "-i",
-                "testfiles/Dog.jpg",
                 "-o",
                 "target/output/simple_output.jpg",
                 "-c",
                 "tests/fixtures/certs/ed25519.pub",
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
-                "--allow-self-signed"
+                "--allow-self-signed",
+                "testfiles/Dog.jpg"
             ],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "simple w/PNG",
+            "name": "Sign: simple w/PNG",
             "cargo": {
                 "args": [
                     "build",
@@ -50,22 +49,21 @@
             "args": [
                 "-m",
                 "examples/simple_manifest.json",
-                "-i",
-                "testfiles/Dog.png",
                 "-o",
                 "target/output/simple_output.png",
                 "-c",
                 "tests/fixtures/certs/ed25519.pub",
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
-                "--allow-self-signed"
+                "--allow-self-signed",
+                "testfiles/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "specVersion w/PNG",
+            "name": "Sign: specVersion w/PNG",
             "cargo": {
                 "args": [
                     "build",
@@ -80,22 +78,21 @@
             "args": [
                 "-m",
                 "examples/specVersion_manifest.json",
-                "-i",
-                "testfiles/Dog.png",
                 "-o",
                 "target/output/specVersion_output.png",
                 "-c",
                 "tests/fixtures/certs/ed25519.pub",
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
-                "--allow-self-signed"
+                "--allow-self-signed",
+                "testfiles/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Extract Dog",
+            "name": "Extract crJSON",
             "cargo": {
                 "args": [
                     "build",
@@ -108,17 +105,17 @@
                 }
             },
             "args": [
-                "-e",
-                "target/test_output/individual/Dog_simple.jpg",
+                "--extract",
+                "target/output/simple_output.jpg",
                 "-o",
-                "target/output/extract_output.json"
+                "target/output/extract_crjson.json"
             ],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "JPT Extract Dog",
+            "name": "Validate crJSON",
             "cargo": {
                 "args": [
                     "build",
@@ -131,11 +128,8 @@
                 }
             },
             "args": [
-                "-e",
-                "--jpt",
-                "target/test_output/individual/Dog_simple.jpg",
-                "-o",
-                "target/output/extract_output-jpt.json"
+                "--validate",
+                "tests/fixtures/minimal_valid_crjson.json"
             ],
             "cwd": "${workspaceFolder}"
         },
