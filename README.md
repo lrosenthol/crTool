@@ -62,6 +62,7 @@ cargo run --release -p crTool-gui
 See [`crtool-gui/README.md`](crtool-gui/README.md) for more details about the GUI.
 
 **Directory Structure Required:**
+
 ```
 parent-directory/
 ├── crTool/               (this repository)
@@ -73,6 +74,7 @@ parent-directory/
 ### For Contributors
 
 The project uses automated code formatting and linting:
+
 - **Pre-commit hooks** check formatting (`cargo fmt`) and linting (`cargo clippy`)
 - Run `./scripts/install-hooks.sh` to install the hooks
 - Run `./scripts/format.sh` to format all code
@@ -247,6 +249,7 @@ You can extract existing C2PA manifests from signed files using the `-e/--extrac
 ```
 
 In extract mode:
+
 - No certificate, key, or manifest file is required
 - The tool outputs crJSON with `@context`, `manifests`, and `validationResults`
 - If the output is a directory, the filename is auto-generated as `{input_stem}_cr.json`
@@ -271,6 +274,7 @@ The tool validates JSON files against the crJSON schema. Use `--validate` for on
 ```
 
 In validation mode:
+
 - No `--output` flag is required (validation doesn't produce any files)
 - The tool validates against `INTERNAL/schemas/crJSON-schema.json`
 - Each input file is validated against the crJSON schema
@@ -281,9 +285,8 @@ In validation mode:
 - A summary report is displayed showing the number of valid and invalid files
 
 Example output for a valid file:
-```
-=== Validating JSON files against crJSON schema ===
 
+```
 Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
@@ -300,9 +303,8 @@ Validating: "manifest.json"
 ```
 
 Example output for an invalid file:
-```
-=== Validating JSON files against crJSON schema ===
 
+```
 Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
@@ -324,7 +326,6 @@ Validating: "invalid_manifest.json"
     - At /manifests/0/claim.v2/version: "string" is not of types "integer", "null"
 Error: 1 file(s) failed validation
 ```
-
 
 ### Algorithm Auto-Detection
 
@@ -412,6 +413,7 @@ To use file-based ingredients, add an `ingredients_from_files` array to your man
 The `metadata` field allows you to attach both standard C2PA metadata and custom key/value pairs to ingredients:
 
 **Standard C2PA metadata fields:**
+
 - `dateTime`: ISO 8601 timestamp
 - `reviewRatings`: Array of review ratings
 - `dataSource`: Structured data source information
@@ -468,6 +470,7 @@ Example manifest with ingredient metadata:
 ```
 
 In this example:
+
 - Standard fields like `title`, `relationship`, and `label` configure the ingredient
 - The `metadata` object contains custom namespaced fields
 - Custom metadata is preserved in the ingredient's AssertionMetadata
@@ -558,8 +561,6 @@ To specify a custom base directory for ingredient paths:
 
 You can use both inline ingredient definitions (via the standard `ingredients` array) and file-based ingredients (via `ingredients_from_files`) in the same manifest. The `ingredients_from_files` are processed separately and won't create duplicate entries.
 
-
-
 ### Common Assertion Types
 
 1. **Actions** (`c2pa.actions`): Records actions performed on the asset
@@ -583,6 +584,7 @@ openssl req -new -x509 -key private_key.pem -out certificate.pem -days 365
 ## Examples
 
 See the `examples/` directory for:
+
 - Sample manifest JSON files
 - Test images
 - Example certificates (for testing only)
@@ -593,7 +595,7 @@ See the `examples/` directory for:
 - **full_manifest.json**: Complete manifest with multiple assertions
 - **simple_with_ingredient.json**: Manifest with a single file-based ingredient
 - **with_ingredients_from_files.json**: Manifest demonstrating multiple file-based ingredients
-- **actions_v2_*.json**: Examples of C2PA Actions v2 assertions (cropped, edited, filtered, etc.)
+- **actions*v2*\*.json**: Examples of C2PA Actions v2 assertions (cropped, edited, filtered, etc.)
 - **asset_ref_manifest.json**: Asset reference assertion example
 - **cloud_data_manifest.json**: Cloud data assertion example
 - **depthmap_gdepth_manifest.json**: Depth map assertion example
@@ -662,6 +664,7 @@ The tool is structured as follows:
 ## Error Handling
 
 The tool provides detailed error messages for common issues:
+
 - Missing or invalid input files
 - Invalid JSON manifest format
 - Certificate or key file errors
@@ -671,6 +674,7 @@ The tool provides detailed error messages for common issues:
 ## Dependencies
 
 Key dependencies:
+
 - [c2pa](https://crates.io/crates/c2pa) - C2PA manifest creation and signing
 - [clap](https://crates.io/crates/clap) - Command-line argument parsing
 - [serde](https://crates.io/crates/serde) & [serde_json](https://crates.io/crates/serde_json) - JSON handling
@@ -686,6 +690,7 @@ Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 **Before contributing:**
+
 1. Install git hooks: `./scripts/install-hooks.sh`
 2. Ensure code is formatted: `cargo fmt`
 3. Ensure clippy passes: `cargo clippy -- -D warnings`
@@ -708,6 +713,7 @@ Ensure your certificate and private key files are in PEM format and match the se
 ### "Failed to sign and embed manifest" Error
 
 Check that:
+
 1. The input file format is supported
 2. The manifest JSON is valid
 3. The signing algorithm matches your key type
@@ -715,6 +721,7 @@ Check that:
 ### Build Errors
 
 If you encounter build errors, ensure you have:
+
 1. The latest Rust toolchain (`rustup update`)
 2. Required system libraries (OpenSSL, etc.)
 3. A C/C++ compiler installed

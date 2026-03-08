@@ -79,13 +79,7 @@ See [TESTING.md](TESTING.md) for test layout and certificates, and [tests/README
 
 ## Generating example certificates
 
-For CLI experimentation (self-signed only):
-
-```bash
-./generate_test_certs.sh
-```
-
-Creates certs in `examples/certs/` for ES256, ES384, ES512, PS256, etc. Use with the CLI; for integration tests the repo uses `tests/fixtures/certs/` (see TESTING.md).
+For CLI experimentation, you can create self-signed certificates (see README.md “Generating Test Certificates”). Integration tests use `tests/fixtures/certs/` (see [TESTING.md](TESTING.md)).
 
 ## Next steps
 

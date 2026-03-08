@@ -205,23 +205,7 @@ pub fn process_manifest(manifest: &str, input: &Path, output: &Path) -> Result<(
 
 ## Project Structure
 
-```
-crTool/
-├── .git-hooks/          # Git hooks (run via scripts/install-hooks.sh)
-├── .github/             # GitHub Actions workflows
-├── examples/            # Example manifests and test certificates
-├── scripts/             # Helper scripts
-├── src/                 # Source code
-│   └── main.rs         # Main application logic
-├── testfiles/          # Test input files
-├── tests/              # Integration tests
-│   ├── common/         # Test utilities
-│   ├── fixtures/       # Test data
-│   └── *.rs            # Test files
-├── Cargo.toml          # Project dependencies
-├── rustfmt.toml        # Formatting configuration
-└── README.md           # User documentation
-```
+crTool is a Cargo workspace with a shared library and two applications (CLI and GUI). For the full directory tree and key locations, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
 ## Common Tasks
 

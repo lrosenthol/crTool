@@ -1,50 +1,12 @@
 # GUI Project Setup - Complete
 
+*Historical summary. Current layout: see [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md) and [crtool-gui/README.md](../crtool-gui/README.md).*
+
 ## What Was Created
 
-Your crTool project now has a complete GUI implementation alongside the existing CLI tool. Here's what was added:
-
-### 1. Library API (`src/lib.rs`) ✅
-A clean, reusable library that exposes:
-- `extract_crjson_manifest()` - Extract manifests in crJSON format (Content Credentials)
-- `validate_json_value()` - Validate JSON against a schema (e.g. crJSON schema)
-- `validate_json_file()` - Validate JSON files
-- `crjson_schema_path()` - Get the bundled crJSON schema path
-
-All functions return structured data (no `println!` output) making them perfect for GUI use.
-
-### 2. GUI Application (`crtool-gui/`) ✅
-A complete egui-based GUI with:
-- **Native file picker** for selecting image files
-- **Automatic manifest extraction** in crJSON format (Content Credentials)
-- **Trust list validation**: Loads C2PA and Content Credentials trust lists at startup so signing certificate trust status (Trusted/Untrusted) is displayed
-- **Real-time validation** against the crJSON schema
-- **Tree view** of manifest structure with collapsible sections
-- **Raw JSON view** with syntax highlighting
-- **Color-coded validation results and trust status** (green for pass, red for fail)
-- **Detailed error messages** showing JSON paths and descriptions
-
-### 3. Workspace Structure ✅
-```
-crTool/
-├── Cargo.toml              # Workspace root + CLI/library config
-├── src/
-│   ├── lib.rs              # NEW: Library API
-│   └── main.rs             # Existing CLI (unchanged)
-├── crtool-gui/             # NEW: GUI crate
-│   ├── Cargo.toml
-│   ├── README.md
-│   └── src/
-│       └── main.rs
-├── build.sh                # NEW: Convenience build script
-└── Cursor-Docs/
-    └── GUI_IMPLEMENTATION.md  # NEW: Architecture docs
-```
-
-### 4. Documentation ✅
-- `crtool-gui/README.md` - GUI-specific documentation
-- `Cursor-Docs/GUI_IMPLEMENTATION.md` - Architecture and implementation guide
-- Updated main `README.md` with GUI information
+- **Library** (`src/lib.rs`): `extract_crjson_manifest()`, `validate_json_value()`, `validate_json_file()`, `crjson_schema_path()` — structured results for GUI use.
+- **GUI** (`crtool-gui/`): egui app with file picker, crJSON extraction, trust list validation, schema validation, tree view, raw JSON view, color-coded status.
+- **Workspace**: Root library, `crtool-cli/` (CLI), `crtool-gui/` (GUI). See [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md).
 
 ## Quick Start
 
@@ -140,16 +102,7 @@ Built with **egui** for:
 3. **Test with your files**: Use files from `testset/`
 
 ### Potential Enhancements
-Consider adding (in priority order):
-
-1. **Drag & Drop** - Drop files directly onto window
-2. **Batch Processing** - Process multiple files at once
-3. **Export Results** - Save validation reports to file
-4. **Image Preview** - Show thumbnail of the image
-5. **Manifest Comparison** - Compare two manifests side-by-side
-6. **Search** - Search within manifest JSON
-7. **History** - Recent files list
-8. **Custom Schema** - Allow loading custom validation schemas
+Some of these are already implemented (e.g. drag & drop, multi-file open). Others to consider: export validation reports, image preview, manifest comparison, search, recent files, custom schema.
 
 ### Distribution
 When ready to distribute:
@@ -180,13 +133,6 @@ For macOS, you might want to create an `.app` bundle. For Windows, consider addi
 - **Clean separation** - Each component has its own Cargo.toml
 - **Easy to maintain** - Clear boundaries between components
 
-### Why Only JPT Extraction?
-You specified you only need JPT extraction for the GUI, which:
-- Simplifies the GUI scope (no signing/embedding)
-- Focuses on the validation workflow
-- Keeps the UI uncluttered
-- Makes it easier to use for non-technical users
-
 ## Verification
 
 Let's verify everything is set up correctly:
@@ -214,7 +160,7 @@ If you encounter issues:
 1. **Build errors**: Ensure you have the latest Rust (`rustup update`)
 2. **Missing c2pa-rs**: Ensure `../c2pa-rs/sdk` exists
 3. **GUI won't start**: Check graphics drivers are up to date
-4. **Schema not found**: Verify `INTERNAL/schemas/indicators-schema.json` exists
+4. **Schema not found**: Verify `INTERNAL/schemas/crJSON-schema.json` exists
 
 ## License
 
