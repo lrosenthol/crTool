@@ -287,7 +287,7 @@ instruments -t "Time Profiler" ./target/release/crTool [args]
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same license as the project (MIT).
+By contributing, you agree that your contributions will be licensed under the same license as the project (Apache-2.0).
 
 ## Recognition
 

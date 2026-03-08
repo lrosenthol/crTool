@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
 description = "GUI for Content Credential Tool - Extract and validate C2PA manifests"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 crtool = { path = ".." }

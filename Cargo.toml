@@ -6,7 +6,7 @@ resolver = "2"
 version = "0.2.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/lrosenthol/crTool"
 
 [package]

@@ -737,7 +737,7 @@ Key dependencies:
 
 ## License
 
-[Specify your license here]
+Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 

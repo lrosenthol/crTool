@@ -200,4 +200,4 @@ cargo run -p crTool-gui
 
 ## License
 
-MIT License - See LICENSE file for details
+Apache License 2.0 - See LICENSE file for details

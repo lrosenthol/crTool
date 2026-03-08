@@ -218,7 +218,7 @@ If you encounter issues:
 
 ## License
 
-Both CLI and GUI use the same MIT license as the original project.
+Both CLI and GUI use the same Apache 2.0 license as the original project.
 
 ---
 
