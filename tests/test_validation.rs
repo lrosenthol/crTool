@@ -38,7 +38,6 @@ fn test_validation_with_valid_crjson() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&valid_file)
         .output()
         .expect("Failed to execute command");
@@ -63,7 +62,6 @@ fn test_validation_with_minimal_valid_crjson() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&valid_file)
         .output()
         .expect("Failed to execute command");
@@ -89,7 +87,6 @@ fn test_validation_with_invalid_crjson() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&invalid_file)
         .output()
         .expect("Failed to execute command");
@@ -116,7 +113,6 @@ fn test_validation_with_malformed_json() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&malformed_file)
         .output()
         .expect("Failed to execute command");
@@ -144,7 +140,6 @@ fn test_validation_with_multiple_files() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&valid_file)
         .arg(&valid_file)
         .output()
@@ -172,7 +167,6 @@ fn test_validation_with_mixed_valid_invalid_files() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&valid_file)
         .arg(&invalid_file)
         .output()
@@ -196,7 +190,6 @@ fn test_validation_with_nonexistent_file() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(&nonexistent)
         .output()
         .expect("Failed to execute command");
@@ -235,14 +228,14 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
                 && path
                     .file_name()
                     .and_then(|n| n.to_str())
-                    .map(|n| n.ends_with("_manifest_crjson.json"))
+                    .map(|n| n.ends_with("_cr.json"))
                     .unwrap_or(false)
         })
         .map(|entry| entry.path())
         .collect();
 
     if extracted_manifests.is_empty() {
-        println!("Skipping test - no extracted crJSON manifests found in test_output");
+        println!("Skipping test - no extracted manifests found in test_output");
         return Ok(());
     }
 
@@ -256,7 +249,6 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
 
     let output = Command::new(&binary)
         .arg("--validate")
-        .arg("--crjson")
         .arg(first_manifest)
         .output()
         .expect("Failed to execute command");

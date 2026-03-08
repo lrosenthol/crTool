@@ -12,8 +12,7 @@ governing permissions and limitations under the License.
 
 use anyhow::{Context, Result};
 use c2pa::{
-    create_signer, Builder, CallbackSigner, CrJsonReader, Ingredient, Reader, Relationship,
-    SigningAlg,
+    create_signer, Builder, CallbackSigner, CrJsonReader, Ingredient, Relationship, SigningAlg,
 };
 use clap::Parser;
 use crtool::{
@@ -59,13 +58,9 @@ struct Cli {
     #[arg(long, default_value = "false")]
     allow_self_signed: bool,
 
-    /// Extract manifest from input file to JSON (read-only mode)
+    /// Extract manifest from input file to JSON (read-only mode; outputs crJSON)
     #[arg(short, long, default_value = "false")]
     extract: bool,
-
-    /// Use crJSON format for extraction, or crJSON schema when validating
-    #[arg(long, default_value = "false")]
-    crjson: bool,
 
     /// Base directory for resolving relative ingredient file paths (defaults to manifest directory)
     #[arg(long, value_name = "DIR")]
@@ -79,7 +74,7 @@ struct Cli {
     #[arg(long, default_value = "false")]
     thumbnail_ingredients: bool,
 
-    /// Validate JSON files against the crJSON schema (requires --crjson)
+    /// Validate JSON files against the crJSON schema
     #[arg(short = 'v', long, default_value = "false")]
     validate: bool,
 
@@ -98,15 +93,6 @@ struct ProcessingConfig<'a> {
     allow_self_signed: bool,
     thumbnail_asset: bool,
     thumbnail_ingredients: bool,
-}
-
-/// Extraction output format for --extract mode.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ExtractFormat {
-    /// Standard Reader JSON
-    Default,
-    /// crJSON format (CrJsonReader)
-    CrJson,
 }
 
 /// Fetch a URL and return the response body as a string
@@ -555,57 +541,41 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     Ok(signature.to_vec())
 }
 
-/// Extract C2PA manifest from a file and save it as JSON
-fn extract_manifest(input_path: &Path, output_path: &Path, format: ExtractFormat) -> Result<()> {
+/// Extract C2PA manifest from a file and save it as crJSON
+fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
     if !input_path.exists() {
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
 
-    println!("Extracting C2PA manifest...");
+    println!("Extracting C2PA manifest (crJSON)...");
     println!("  Input: {:?}", input_path);
-    if format == ExtractFormat::CrJson {
-        println!("  Format: crJSON");
+
+    let crjson_reader = CrJsonReader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = crjson_reader
+        .inner()
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?;
+
+    println!("  Active manifest label: {}", active_label);
+
+    let json_str = crjson_reader.json();
+    let mut json_value: JsonValue =
+        serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
+    crtool::normalize_crjson_validation_results(&mut json_value);
+    // Ensure @context is present for valid crJSON (SDK may omit it)
+    if !json_value.get("@context").is_some() {
+        if let Some(obj) = json_value.as_object_mut() {
+            obj.insert(
+                "@context".to_string(),
+                serde_json::json!(["https://contentcredentials.org/crjson/context/v1"]),
+            );
+        }
     }
 
-    let json_value: JsonValue = match format {
-        ExtractFormat::CrJson => {
-            let crjson_reader = CrJsonReader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-            let active_label = crjson_reader
-                .inner()
-                .active_label()
-                .context("No active C2PA manifest found in the input file")?;
-
-            println!("  Active manifest label: {}", active_label);
-
-            let json_str = crjson_reader.json();
-            let mut value: JsonValue =
-                serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
-            crtool::normalize_crjson_validation_results(&mut value);
-            value
-        }
-        ExtractFormat::Default => {
-            let reader = Reader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-            let active_label = reader
-                .active_label()
-                .context("No active C2PA manifest found in the input file")?;
-
-            println!("  Active manifest label: {}", active_label);
-
-            let json_str = reader.json();
-            serde_json::from_str(&json_str).context("Failed to parse manifest JSON")?
-        }
-    };
-
-    let suffix = match format {
-        ExtractFormat::CrJson => "_manifest_crjson.json",
-        ExtractFormat::Default => "_manifest.json",
-    };
+    const SUFFIX: &str = "_cr.json";
 
     let final_output_path = if output_path.is_dir() {
         let input_stem = input_path
@@ -613,7 +583,7 @@ fn extract_manifest(input_path: &Path, output_path: &Path, format: ExtractFormat
             .context("Input file has no filename")?
             .to_str()
             .context("Invalid UTF-8 in filename")?;
-        output_path.join(format!("{}{}", input_stem, suffix))
+        output_path.join(format!("{}{}", input_stem, SUFFIX))
     } else {
         output_path.to_path_buf()
     };
@@ -886,33 +856,17 @@ fn main() -> Result<()> {
 
     println!("Found {} input file(s) to process", input_files.len());
 
-    // Handle validation mode
+    // Handle validation mode (validates against crJSON schema)
     if cli.validate {
-        // In validation mode, input files are validated against the crJSON schema. --crjson is required.
-        if !cli.crjson {
-            anyhow::bail!(
-                "--validate requires --crjson; validate JSON files against the crJSON schema"
-            );
-        }
         let schema_path = crtool::crjson_schema_path();
         return validate_json_files(&input_files, &schema_path, "crJSON");
     }
 
-    // Handle extract mode
+    // Handle extract mode (always outputs crJSON)
     if cli.extract {
         let output = cli
             .output
             .context("--output is required when using --extract mode")?;
-
-        let extract_format = if cli.crjson {
-            ExtractFormat::CrJson
-        } else {
-            ExtractFormat::Default
-        };
-
-        if cli.crjson {
-            println!("Using crJSON format for extraction");
-        }
 
         if input_files.len() > 1 && !output.is_dir() {
             anyhow::bail!(
@@ -925,7 +879,7 @@ fn main() -> Result<()> {
         let mut error_count = 0;
 
         for input_file in &input_files {
-            match extract_manifest(input_file, &output, extract_format) {
+            match extract_manifest(input_file, &output) {
                 Ok(_) => success_count += 1,
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);
@@ -944,10 +898,6 @@ fn main() -> Result<()> {
         }
 
         return Ok(());
-    }
-
-    if cli.crjson {
-        anyhow::bail!("--crjson can only be used with --extract or --validate mode");
     }
 
     // Normal signing mode - validate required arguments

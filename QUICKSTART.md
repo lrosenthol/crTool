@@ -114,7 +114,7 @@ Binaries:
 
 ## What’s next?
 
-- **CLI**: See [README.md](README.md) for all options (extract, validate, multiple files, globs, `--crjson`, `--trust`).
+- **CLI**: See [README.md](README.md) for all options (extract, validate, multiple files, globs, `--trust`).
 - **GUI**: See [crtool-gui/README.md](crtool-gui/README.md) and [Cursor-Docs/GUI_IMPLEMENTATION.md](Cursor-Docs/GUI_IMPLEMENTATION.md).
 - **Setup**: Full clone and verify steps in [SETUP.md](SETUP.md).
 - **Development**: Hooks, fmt, clippy in [DEVELOPMENT.md](DEVELOPMENT.md).

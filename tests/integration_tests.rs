@@ -967,22 +967,21 @@ fn test_extract_manifest_to_specific_file() -> Result<()> {
 
     sign_file_with_manifest(&input, &signed_output, &manifest)?;
 
-    // Now extract the manifest to a specific JSON file
+    // Now extract the manifest to a specific JSON file (crJSON)
     let json_output = output_dir().join("extracted/extracted_manifest.json");
-    common::extract_manifest_to_file(&signed_output, &json_output)?;
+    common::extract_manifest_to_file_crjson(&signed_output, &json_output)?;
 
     // Verify the JSON file was created
     assert!(json_output.exists(), "Extracted JSON file should exist");
 
-    // Verify the JSON file is valid and contains expected data
+    // Verify the JSON file is valid crJSON
     let json_content = fs::read_to_string(&json_output)?;
     let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
 
-    // Check that it has the expected structure
     assert!(json_value.is_object(), "JSON should be an object");
     assert!(
-        json_value.get("manifests").is_some() || json_value.get("active_manifest").is_some(),
-        "JSON should contain manifest data"
+        json_value.get("@context").is_some() && json_value.get("manifests").is_some(),
+        "JSON should be crJSON with @context and manifests"
     );
 
     println!(
@@ -1007,10 +1006,9 @@ fn test_extract_manifest_to_directory() -> Result<()> {
     let extract_dir = output_dir().join("extracted");
     fs::create_dir_all(&extract_dir)?;
 
-    // Extract the manifest to the directory
-    // The helper will create a filename based on the input
-    let expected_json = extract_dir.join("Dog_extract_dir_test_manifest.json");
-    common::extract_manifest_to_file(&signed_output, &expected_json)?;
+    // Extract the manifest to the directory (crJSON)
+    let expected_json = extract_dir.join("Dog_extract_dir_test_cr.json");
+    common::extract_manifest_to_file_crjson(&signed_output, &expected_json)?;
 
     // Verify the JSON file was created in the directory
     assert!(
@@ -1018,27 +1016,20 @@ fn test_extract_manifest_to_directory() -> Result<()> {
         "Extracted JSON file should exist in directory"
     );
 
-    // Verify the JSON file is valid
+    // Verify the JSON file is valid crJSON
     let json_content = fs::read_to_string(&expected_json)?;
     let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
 
     assert!(json_value.is_object(), "JSON should be an object");
-
-    // Verify it contains the title from the full_manifest.json
-    if let Some(manifests) = json_value.get("manifests").and_then(|m| m.as_object()) {
-        // The manifests object contains manifest labels as keys
-        let has_title = manifests.values().any(|manifest| {
-            manifest
-                .get("title")
-                .and_then(|t| t.as_str())
-                .map(|s| s.contains("Edited Photo"))
-                .unwrap_or(false)
-        });
-        assert!(
-            has_title,
-            "Manifest should contain title from full_manifest.json"
-        );
-    }
+    assert!(
+        json_value.get("@context").is_some(),
+        "Extracted output should have @context (crJSON)"
+    );
+    let manifests = json_value
+        .get("manifests")
+        .and_then(|m| m.as_array())
+        .expect("crJSON should have manifests array");
+    assert!(!manifests.is_empty(), "Should have at least one manifest");
 
     println!(
         "✓ Successfully extracted manifest to directory: {}",
@@ -1849,11 +1840,11 @@ fn test_multiple_files_extract() -> Result<()> {
     );
 
     // Verify manifest files were created
-    let manifest1 = extract_dir.join("Dog_signed_manifest.json");
+    let manifest1 = extract_dir.join("Dog_signed_cr.json");
 
     assert!(
         manifest1.exists(),
-        "Manifest file Dog_signed_manifest.json should exist"
+        "Manifest file Dog_signed_cr.json should exist"
     );
     // Note: Both files will have the same name since they're both "Dog_signed"
     // In a real scenario, you'd want different filenames
@@ -2054,8 +2045,7 @@ fn test_testset_manifests_crjson() -> Result<()> {
                     output.file_name().unwrap().to_str().unwrap(),
                 );
 
-                let extracted_json =
-                    testset_dir.join(format!("{}_manifest_crjson.json", manifest_name));
+                let extracted_json = testset_dir.join(format!("{}_cr.json", manifest_name));
                 std::fs::write(&extracted_json, &extraction.manifest_json)?;
 
                 let schema_path = crtool::crjson_schema_path();

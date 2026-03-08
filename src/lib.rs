@@ -300,7 +300,7 @@ pub fn validate_json_file<P: AsRef<Path>>(
 
 /// Get the crJSON schema path relative to the crate root
 ///
-/// Use this when validating crJSON documents (e.g. output of `--extract --crjson`).
+/// Use this when validating crJSON documents (e.g. output of `--extract`).
 pub fn crjson_schema_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("INTERNAL")

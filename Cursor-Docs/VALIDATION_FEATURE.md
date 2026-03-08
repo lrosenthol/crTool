@@ -2,7 +2,7 @@
 
 ## Overview
 
-The command-line option `-v, --validate` (with `--crjson`) validates JSON files against the crJSON schema located at `INTERNAL/schemas/crJSON-schema.json`.
+The command-line option `-v, --validate` validates JSON files against the crJSON schema located at `INTERNAL/schemas/crJSON-schema.json`.
 
 ## Changes Made
 
@@ -17,7 +17,7 @@ The command-line option `-v, --validate` (with `--crjson`) validates JSON files 
 
 ### 3. Validation Implementation (src/main.rs)
 - Function: `validate_json_files(input_paths: &[PathBuf], schema_path, schema_label) -> Result<()>`
-  - Loads the crJSON schema from `INTERNAL/schemas/crJSON-schema.json` (when `--validate --crjson` is used)
+  - Loads the crJSON schema from `INTERNAL/schemas/crJSON-schema.json`
   - Compiles the schema using the `jsonschema` crate
   - Validates each input file against the schema
   - Provides detailed error messages with:
