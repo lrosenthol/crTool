@@ -1,6 +1,6 @@
 [package]
 name = "crTool"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
 description = "CLI for Content Credential Tool - Create, embed, extract, and validate C2PA manifests"

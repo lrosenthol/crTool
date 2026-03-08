@@ -1,6 +1,6 @@
 [package]
 name = "crTool-gui"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Leonard Rosenthol"]
 description = "GUI for Content Credential Tool - Extract and validate C2PA manifests"
