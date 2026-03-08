@@ -45,7 +45,6 @@ crTool/
 │   ├── README.md                  # Test suite documentation
 │   ├── integration_tests.rs       # Sign + verify integration tests
 │   ├── test_crjson_extraction.rs
-│   ├── test_jpt_extraction.rs
 │   ├── test_validation.rs
 │   ├── common/
 │   │   └── mod.rs                 # Test helpers
@@ -92,7 +91,7 @@ crTool/
 ## Key Directories
 
 ### Source
-- **src/lib.rs**: Shared library API (e.g. `extract_jpt_manifest`, `validate_json_value`, Builder from JSON). Used by both CLI and GUI.
+- **src/lib.rs**: Shared library API (e.g. `extract_crjson_manifest`, `validate_json_value`, Builder from JSON). Used by both CLI and GUI.
 - **crtool-cli/src/main.rs**: CLI (sign, extract, validate) with `clap`, file I/O, and cert handling.
 - **crtool-gui/src/main.rs**: Native GUI for opening files, extracting manifests (crJSON), validation, tree view, and trust status.
 

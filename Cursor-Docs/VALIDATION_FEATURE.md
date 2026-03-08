@@ -2,7 +2,7 @@
 
 ## Overview
 
-Added a new command-line option (`-v, --validate`) that validates JSON files against the JPEG Trust indicators schema located at `INTERNAL/schemas/indicators-schema.json`.
+The command-line option `-v, --validate` (with `--crjson`) validates JSON files against the crJSON schema located at `INTERNAL/schemas/crJSON-schema.json`.
 
 ## Changes Made
 
@@ -16,8 +16,8 @@ Added a new command-line option (`-v, --validate`) that validates JSON files aga
 - Updated error messages to clarify when `--output` is required
 
 ### 3. Validation Implementation (src/main.rs)
-- New function: `validate_json_files(input_paths: &[PathBuf]) -> Result<()>`
-  - Loads the indicators schema from `INTERNAL/schemas/indicators-schema.json`
+- Function: `validate_json_files(input_paths: &[PathBuf], schema_path, schema_label) -> Result<()>`
+  - Loads the crJSON schema from `INTERNAL/schemas/crJSON-schema.json` (when `--validate --crjson` is used)
   - Compiles the schema using the `jsonschema` crate
   - Validates each input file against the schema
   - Provides detailed error messages with:

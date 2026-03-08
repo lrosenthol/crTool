@@ -25,16 +25,15 @@ The library exposes a clean, non-CLI API for GUI integration:
 
 ### Core Functions
 
-1. **`extract_jpt_manifest(path)`**
-   - Extracts C2PA manifest in JPEG Trust format
+1. **`extract_crjson_manifest(path)`**
+   - Extracts C2PA manifest in crJSON format (Content Credentials)
    - Returns `ManifestExtractionResult` with:
      - Parsed JSON manifest
      - Active manifest label
-     - Computed asset hash
      - Raw JSON string
 
 2. **`validate_json_value(json, schema_path)`**
-   - Validates a JSON value against the indicators schema
+   - Validates a JSON value against a JSON schema (e.g. crJSON schema)
    - Returns `ValidationResult` with:
      - Validation status (pass/fail)
      - Detailed error messages with JSON paths
@@ -42,8 +41,8 @@ The library exposes a clean, non-CLI API for GUI integration:
 3. **`validate_json_file(file_path, schema_path)`**
    - Convenience wrapper for validating JSON files
 
-4. **`default_schema_path()`**
-   - Returns path to the bundled indicators schema
+4. **`crjson_schema_path()`**
+   - Returns path to the bundled crJSON schema
 
 ### Design Principles
 

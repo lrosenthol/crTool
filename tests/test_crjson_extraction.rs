@@ -11,7 +11,6 @@ governing permissions and limitations under the License.
 */
 
 //! crJSON extraction tests (CLI --crjson and CrJsonReader helper).
-//! Mirrors the structure of test_jpt_extraction.rs for JPEG Trust format.
 
 use anyhow::Result;
 use std::fs;

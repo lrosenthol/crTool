@@ -23,8 +23,6 @@ if ! cargo fmt -- --check; then
 fi
 echo "✓ Formatting check passed"
 
-# Run clippy (omit --all-features so optional jpeg_trust is not enabled; it requires
-# JpegTrustReader from c2pa-rs which is not currently exported)
 echo "→ Running clippy..."
 if ! cargo clippy --all-targets -- -D warnings; then
     echo ""

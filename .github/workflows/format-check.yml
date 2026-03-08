@@ -54,8 +54,6 @@ jobs:
         with:
           components: clippy
 
-      # Omit --all-features so the optional "jpeg_trust" feature stays off (it requires
-      # JpegTrustReader from c2pa-rs, which is not currently exported).
       - name: Run clippy
         working-directory: crTool
         run: cargo clippy --all-targets -- -D warnings

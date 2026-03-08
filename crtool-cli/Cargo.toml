@@ -14,8 +14,6 @@ name = "crTool"
 path = "src/main.rs"
 
 [features]
-# Enable when c2pa-rs exposes JpegTrustReader again. Do not use --all-features in CI/hooks.
-jpeg_trust = []
 
 [dependencies]
 crtool = { path = ".." }

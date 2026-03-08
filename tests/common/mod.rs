@@ -14,8 +14,6 @@ governing permissions and limitations under the License.
 #![allow(dead_code)]
 
 use anyhow::Result;
-#[cfg(feature = "jpeg_trust")]
-use c2pa::JpegTrustReader;
 use c2pa::{Builder, CallbackSigner, CrJsonReader, Ingredient, Reader, Relationship, SigningAlg};
 use std::collections::HashSet;
 use std::fs;
@@ -531,14 +529,9 @@ pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool 
     }
 }
 
-/// Helper function to extract manifest from a signed file
+/// Helper function to extract manifest from a signed file (standard Reader JSON).
 pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result<()> {
-    extract_manifest_impl(input_path, output_path, false)
-}
-
-/// Helper function to extract manifest from a signed file in JPEG Trust format
-pub fn extract_manifest_to_file_jpt(input_path: &Path, output_path: &Path) -> Result<()> {
-    extract_manifest_impl(input_path, output_path, true)
+    extract_manifest_impl(input_path, output_path)
 }
 
 /// Helper function to extract manifest from a signed file in crJSON format (CrJsonReader).
@@ -558,41 +551,17 @@ pub fn extract_manifest_to_file_crjson(input_path: &Path, output_path: &Path) ->
     Ok(())
 }
 
-/// Internal implementation for extracting manifests
-fn extract_manifest_impl(input_path: &Path, output_path: &Path, use_jpt: bool) -> Result<()> {
-    // Remove output file if it already exists
+/// Internal implementation for extracting manifests (standard Reader JSON).
+fn extract_manifest_impl(input_path: &Path, output_path: &Path) -> Result<()> {
     if output_path.exists() {
         fs::remove_file(output_path)?;
     }
 
-    // Get the manifest JSON based on format
-    let manifest_json = if use_jpt {
-        #[cfg(feature = "jpeg_trust")]
-        {
-            let mut jpt_reader = JpegTrustReader::from_file(input_path)?;
-            let _ = jpt_reader.compute_asset_hash_from_file(input_path);
-            let _active_label = jpt_reader
-                .inner()
-                .active_label()
-                .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
-            jpt_reader.json()
-        }
-        #[cfg(not(feature = "jpeg_trust"))]
-        {
-            // Fallback when JpegTrustReader is not available from c2pa-rs
-            let reader = Reader::from_file(input_path)?;
-            let _active_label = reader
-                .active_label()
-                .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
-            reader.json()
-        }
-    } else {
-        let reader = Reader::from_file(input_path)?;
-        let _active_label = reader
-            .active_label()
-            .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
-        reader.json()
-    };
+    let reader = Reader::from_file(input_path)?;
+    let _active_label = reader
+        .active_label()
+        .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+    let manifest_json = reader.json();
 
     // Create output directory if needed
     if let Some(parent) = output_path.parent() {
