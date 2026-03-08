@@ -1,5 +1,7 @@
 # JSON Schema Validation Feature
 
+*Implementation note. User-facing behavior is documented in the root [README.md](../README.md) (“Validating JSON Files”).*
+
 ## Overview
 
 The command-line option `-v, --validate` validates JSON files against the crJSON schema located at `INTERNAL/schemas/crJSON-schema.json`.
@@ -82,9 +84,9 @@ Updated documentation:
 
 ### Valid File
 ```
-=== Validating JSON files against indicators schema ===
+=== Validating JSON files against crJSON schema ===
 
-Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
 
@@ -101,9 +103,9 @@ Validating: "manifest.json"
 
 ### Invalid File
 ```
-=== Validating JSON files against indicators schema ===
+=== Validating JSON files against crJSON schema ===
 
-Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
 

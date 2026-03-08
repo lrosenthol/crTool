@@ -90,7 +90,7 @@ All 39 tests pass, including the 4 new ingredient-specific tests.
 ```bash
 crTool \
   --manifest examples/simple_with_ingredient.json \
-  --input output.jpg \
+  output.jpg \
   --output signed.jpg \
   --cert cert.pem \
   --key key.pem
@@ -100,7 +100,7 @@ crTool \
 ```bash
 crTool \
   --manifest examples/with_ingredients_from_files.json \
-  --input output.jpg \
+  output.jpg \
   --output signed.jpg \
   --cert cert.pem \
   --key key.pem \
@@ -112,7 +112,7 @@ crTool \
 ```bash
 crTool \
   --manifest manifest.json \
-  --input output.jpg \
+  output.jpg \
   --output signed.jpg \
   --cert cert.pem \
   --key key.pem \

@@ -68,7 +68,6 @@ crTool/
 ├── build.sh                       # Build script (--all, --gui-only, --mac-app)
 ├── verify_setup.sh                # Verify clone, deps, build, tests
 ├── verify-gui-setup.sh            # Verify GUI build
-├── generate_test_certs.sh         # Generate example certs (examples/certs/)
 ├── README.md
 ├── QUICKSTART.md
 ├── PROJECT_STRUCTURE.md
@@ -132,4 +131,4 @@ crTool/
 - **DEVELOPMENT.md**: Hooks, fmt, clippy, CI, workflow.
 - **TESTING.md**: Integration tests, certs, running and verifying.
 - **crtool-cli/README.md**, **crtool-gui/README.md**: Per-tool details.
-- **Cursor-Docs/**: Implementation and feature notes.
+- **Cursor-Docs/README.md**: Index of implementation and historical notes (Cursor-Docs/*.md).

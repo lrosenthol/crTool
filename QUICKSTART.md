@@ -21,15 +21,7 @@ parent/
 cargo build --release -p crTool
 ```
 
-### 2. Generate test certificates (optional)
-
-```bash
-./generate_test_certs.sh
-```
-
-Creates self-signed certs in `examples/certs/` for ES256, ES384, ES512, PS256, etc.
-
-### 3. Sign an image
+### 2. Sign an image
 
 Use the included test certs with `--allow-self-signed`:
 
@@ -44,19 +36,9 @@ Use the included test certs with `--allow-self-signed`:
   --allow-self-signed
 ```
 
-Or with generated certs:
+For other certs (e.g. self-signed ES256), see README.md “Generating Test Certificates” and use the same positional input style (input file(s) after `--manifest`).
 
-```bash
-./target/release/crTool \
-  --manifest examples/simple_manifest.json \
-  --input test.jpg \
-  --output test_signed.jpg \
-  --cert examples/certs/es256_cert.pem \
-  --key examples/certs/es256_private.pem \
-  --algorithm es256
-```
-
-### 4. Verify (optional)
+### 3. Verify (optional)
 
 ```bash
 cargo install c2pa-tool
@@ -83,8 +65,8 @@ cargo run --release -p crTool-gui
 
 ### 2. Use the GUI
 
-1. Click **"📂 Select Image File"** or drag and drop a file.
-2. Choose a JPEG, PNG, or WebP with a C2PA manifest (e.g. `testset/test_ingredient_manifest.jpg`).
+1. Click **"📂 Select File(s)..."** (or **File → Open...**) or drag and drop files.
+2. Choose one or more C2PA-supported files (e.g. JPEG, PNG, WebP with a manifest, such as `testset/test_ingredient_manifest.jpg`).
 3. View results:
    - ✓ Green checkmark if valid, ✗ red X with errors if invalid
    - Trust status (Trusted/Untrusted) from C2PA and Content Credentials trust lists
@@ -115,7 +97,7 @@ Binaries:
 ## What’s next?
 
 - **CLI**: See [README.md](README.md) for all options (extract, validate, multiple files, globs, `--trust`).
-- **GUI**: See [crtool-gui/README.md](crtool-gui/README.md) and [Cursor-Docs/GUI_IMPLEMENTATION.md](Cursor-Docs/GUI_IMPLEMENTATION.md).
+- **GUI**: See [crtool-gui/README.md](crtool-gui/README.md).
 - **Setup**: Full clone and verify steps in [SETUP.md](SETUP.md).
 - **Development**: Hooks, fmt, clippy in [DEVELOPMENT.md](DEVELOPMENT.md).
 

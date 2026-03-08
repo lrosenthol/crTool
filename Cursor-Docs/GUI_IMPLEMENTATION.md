@@ -194,7 +194,7 @@ cargo run -p crTool-gui
 - On macOS, app needs file access permissions
 
 ### Schema Not Found
-- Verify `INTERNAL/schemas/indicators-schema.json` exists
+- Verify `INTERNAL/schemas/crJSON-schema.json` exists
 - Check `CARGO_MANIFEST_DIR` environment variable
 
 ## License

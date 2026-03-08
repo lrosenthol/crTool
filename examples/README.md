@@ -23,24 +23,24 @@ A comprehensive manifest with extensive metadata:
 
 **Use case**: Professional photo editing with complete provenance tracking.
 
-### 3. with_ingredients.json
+### 3. with_ingredients.json / with_ingredients_from_files.json
 
-A manifest showing composite content from multiple sources:
-- Multiple actions including compositing
-- Ingredient list (parent images)
-- Relationship tracking between assets
+Manifests showing composite content from multiple sources:
+- **with_ingredients.json**: Inline ingredient definitions
+- **with_ingredients_from_files.json**: File-based ingredients (`ingredients_from_files`) with paths to source files
+- Relationship tracking (parentOf / componentOf)
 
-**Use case**: Creating composite images from multiple source files.
+**Use case**: Creating composite images from multiple source files. See also **simple_with_ingredient.json** for a minimal file-based ingredient example.
 
 ## Using These Examples
 
-To use any of these examples with the tool:
+Run from the repository root. Input file(s) are positional (after `--manifest`); no `--input` flag.
 
 ```bash
 # Simple example
 ./target/release/crTool \
   --manifest examples/simple_manifest.json \
-  --input your_image.jpg \
+  your_image.jpg \
   --output output.jpg \
   --cert your_cert.pem \
   --key your_key.pem
@@ -48,15 +48,15 @@ To use any of these examples with the tool:
 # Full metadata example
 ./target/release/crTool \
   --manifest examples/full_manifest.json \
-  --input your_image.jpg \
+  your_image.jpg \
   --output output.jpg \
   --cert your_cert.pem \
   --key your_key.pem
 
-# With ingredients
+# With file-based ingredients
 ./target/release/crTool \
-  --manifest examples/with_ingredients.json \
-  --input your_composite.jpg \
+  --manifest examples/with_ingredients_from_files.json \
+  your_composite.jpg \
   --output output.jpg \
   --cert your_cert.pem \
   --key your_key.pem
@@ -114,9 +114,13 @@ cargo install c2pa-tool
 c2pa output.jpg
 ```
 
+## More Examples
+
+This directory also includes: **simple_with_ingredient.json**, **actions_v2_*.json** (cropped, edited, filtered, etc.), **asset_ref_manifest.json**, **cloud_data_manifest.json**, **depthmap_gdepth_manifest.json**, and others. See the root [README.md](../README.md) for the full list and usage.
+
 ## More Information
 
 For more details on the C2PA specification:
-- [C2PA Specification](https://c2pa.org/specifications/specifications/1.0/index.html)
-- [Action Taxonomy](https://c2pa.org/specifications/specifications/1.0/specs/C2PA_Specification.html#_actions)
-- [Assertion Reference](https://c2pa.org/specifications/specifications/1.0/specs/C2PA_Specification.html#_claim_assertions)
+- [C2PA Specification](https://c2pa.org/specifications/specifications/2.2/index.html)
+- [Action Taxonomy](https://c2pa.org/specifications/specifications/2.2/specs/C2PA_Specification.html#_actions)
+- [Assertion Reference](https://c2pa.org/specifications/specifications/2.2/specs/C2PA_Specification.html#_claim_assertions)
