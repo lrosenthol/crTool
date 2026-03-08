@@ -6,10 +6,10 @@ Your crTool project now has a complete GUI implementation alongside the existing
 
 ### 1. Library API (`src/lib.rs`) ✅
 A clean, reusable library that exposes:
-- `extract_jpt_manifest()` - Extract manifests in JPEG Trust format
-- `validate_json_value()` - Validate JSON against the indicators schema
+- `extract_crjson_manifest()` - Extract manifests in crJSON format (Content Credentials)
+- `validate_json_value()` - Validate JSON against a schema (e.g. crJSON schema)
 - `validate_json_file()` - Validate JSON files
-- `default_schema_path()` - Get the bundled schema path
+- `crjson_schema_path()` - Get the bundled crJSON schema path
 
 All functions return structured data (no `println!` output) making them perfect for GUI use.
 
@@ -80,8 +80,8 @@ Use the test files in your `testset/` directory:
 ## Features Implemented
 
 ### ✅ Core Functionality
-- [x] Extract C2PA manifests in JPEG Trust format
-- [x] Validate against indicators schema
+- [x] Extract C2PA manifests in crJSON format
+- [x] Validate against crJSON schema
 - [x] Display asset hash
 - [x] Show active manifest label
 - [x] Display validation errors with JSON paths

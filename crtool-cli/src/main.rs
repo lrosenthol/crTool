@@ -11,11 +11,8 @@ governing permissions and limitations under the License.
 */
 
 use anyhow::{Context, Result};
-#[cfg(feature = "jpeg_trust")]
-use c2pa::JpegTrustReader;
 use c2pa::{
-    create_signer, Builder, CallbackSigner, CrJsonReader, Ingredient, Reader, Relationship,
-    SigningAlg,
+    create_signer, Builder, CallbackSigner, CrJsonReader, Ingredient, Relationship, SigningAlg,
 };
 use clap::Parser;
 use crtool::{
@@ -61,17 +58,9 @@ struct Cli {
     #[arg(long, default_value = "false")]
     allow_self_signed: bool,
 
-    /// Extract manifest from input file to JSON (read-only mode)
+    /// Extract manifest from input file to JSON (read-only mode; outputs crJSON)
     #[arg(short, long, default_value = "false")]
     extract: bool,
-
-    /// Use JPEG Trust format for extraction (only valid with --extract)
-    #[arg(long, default_value = "false")]
-    jpt: bool,
-
-    /// Use crJSON format for extraction, or crJSON schema when validating (mutually exclusive with --jpt)
-    #[arg(long, default_value = "false")]
-    crjson: bool,
 
     /// Base directory for resolving relative ingredient file paths (defaults to manifest directory)
     #[arg(long, value_name = "DIR")]
@@ -85,7 +74,7 @@ struct Cli {
     #[arg(long, default_value = "false")]
     thumbnail_ingredients: bool,
 
-    /// Validate JSON files against the indicators schema
+    /// Validate JSON files against the crJSON schema
     #[arg(short = 'v', long, default_value = "false")]
     validate: bool,
 
@@ -104,17 +93,6 @@ struct ProcessingConfig<'a> {
     allow_self_signed: bool,
     thumbnail_asset: bool,
     thumbnail_ingredients: bool,
-}
-
-/// Extraction output format for --extract mode.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ExtractFormat {
-    /// Standard Reader JSON
-    Default,
-    /// JPEG Trust format (when available)
-    Jpt,
-    /// crJSON format (CrJsonReader)
-    CrJson,
 }
 
 /// Fetch a URL and return the response body as a string
@@ -563,151 +541,41 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     Ok(signature.to_vec())
 }
 
-/// Extract C2PA manifest from a file and save it as JSON
-fn extract_manifest(input_path: &Path, output_path: &Path, format: ExtractFormat) -> Result<()> {
+/// Extract C2PA manifest from a file and save it as crJSON
+fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
     if !input_path.exists() {
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
 
-    println!("Extracting C2PA manifest...");
+    println!("Extracting C2PA manifest (crJSON)...");
     println!("  Input: {:?}", input_path);
-    match format {
-        ExtractFormat::Jpt => println!("  Format: JPEG Trust"),
-        ExtractFormat::CrJson => println!("  Format: crJSON"),
-        ExtractFormat::Default => {}
+
+    let crjson_reader = CrJsonReader::from_file(input_path).context(
+        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+    )?;
+
+    let active_label = crjson_reader
+        .inner()
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?;
+
+    println!("  Active manifest label: {}", active_label);
+
+    let json_str = crjson_reader.json();
+    let mut json_value: JsonValue =
+        serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
+    crtool::normalize_crjson_validation_results(&mut json_value);
+    // Ensure @context is present for valid crJSON (SDK may omit it)
+    if !json_value.get("@context").is_some() {
+        if let Some(obj) = json_value.as_object_mut() {
+            obj.insert(
+                "@context".to_string(),
+                serde_json::json!(["https://contentcredentials.org/crjson/context/v1"]),
+            );
+        }
     }
 
-    let json_value: JsonValue = match format {
-        ExtractFormat::Jpt => {
-            #[cfg(feature = "jpeg_trust")]
-            {
-                // Use JPEG Trust Reader (when c2pa-rs exposes it)
-                let mut jpt_reader = JpegTrustReader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-                if let Ok(hash) = jpt_reader.compute_asset_hash_from_file(input_path) {
-                    println!("  Asset hash computed: {}", hash);
-                }
-
-                let active_label = jpt_reader
-                    .inner()
-                    .active_label()
-                    .context("No active C2PA manifest found in the input file")?;
-
-                println!("  Active manifest label: {}", active_label);
-
-                let json_str = jpt_reader.json();
-                let mut value: JsonValue =
-                    serde_json::from_str(&json_str).context("Failed to parse JPT JSON")?;
-
-                let already_has_cgi = value
-                    .get("manifests")
-                    .and_then(|m| m.as_array())
-                    .and_then(|arr| {
-                        arr.iter()
-                            .find(|m| m.get("label").and_then(|l| l.as_str()) == Some(active_label))
-                    })
-                    .and_then(|m| m.get("claim.v2"))
-                    .and_then(|c| c.get("claim_generator_info"))
-                    .is_some();
-
-                if !already_has_cgi {
-                    if let Some(manifests) =
-                        value.get_mut("manifests").and_then(|m| m.as_array_mut())
-                    {
-                        if let Some(active_manifest) = jpt_reader.inner().active_manifest() {
-                            if let Some(cgi) = active_manifest.claim_generator_info.as_ref() {
-                                if let Ok(cgi_value) = serde_json::to_value(cgi) {
-                                    for manifest_obj in manifests.iter_mut() {
-                                        let label_matches = manifest_obj
-                                            .get("label")
-                                            .and_then(|l| l.as_str())
-                                            .map(|l| l == active_label)
-                                            .unwrap_or(false);
-                                        if label_matches {
-                                            if let Some(claim_v2) = manifest_obj
-                                                .get_mut("claim.v2")
-                                                .and_then(|c| c.as_object_mut())
-                                            {
-                                                claim_v2.insert(
-                                                    "claim_generator_info".to_string(),
-                                                    cgi_value,
-                                                );
-                                                println!("  (claim_generator_info was missing in JPT output; added from Reader's manifest)");
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            println!("  (claim_generator_info missing in JPT output; Reader's manifest also has no claim_generator_info)");
-                        }
-                    }
-                }
-                crtool::normalize_jpt_jumbf_identifiers(&mut value);
-                value
-            }
-            #[cfg(not(feature = "jpeg_trust"))]
-            {
-                // Fallback when JpegTrustReader is not available: use standard Reader
-                let reader = Reader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-                let active_label = reader
-                    .active_label()
-                    .context("No active C2PA manifest found in the input file")?;
-
-                println!("  Active manifest label: {}", active_label);
-
-                let json_str = reader.json();
-                let mut value: JsonValue =
-                    serde_json::from_str(&json_str).context("Failed to parse manifest JSON")?;
-                crtool::normalize_jpt_jumbf_identifiers(&mut value);
-                value
-            }
-        }
-        ExtractFormat::CrJson => {
-            let crjson_reader = CrJsonReader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-            let active_label = crjson_reader
-                .inner()
-                .active_label()
-                .context("No active C2PA manifest found in the input file")?;
-
-            println!("  Active manifest label: {}", active_label);
-
-            let json_str = crjson_reader.json();
-            let mut value: JsonValue =
-                serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
-            crtool::normalize_crjson_validation_results(&mut value);
-            value
-        }
-        ExtractFormat::Default => {
-            let reader = Reader::from_file(input_path).context(
-                "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-            )?;
-
-            let active_label = reader
-                .active_label()
-                .context("No active C2PA manifest found in the input file")?;
-
-            println!("  Active manifest label: {}", active_label);
-
-            let json_str = reader.json();
-            serde_json::from_str(&json_str).context("Failed to parse manifest JSON")?
-        }
-    };
-
-    let suffix = match format {
-        ExtractFormat::Jpt => "_manifest_jpt.json",
-        ExtractFormat::CrJson => "_manifest_crjson.json",
-        ExtractFormat::Default => "_manifest.json",
-    };
+    const SUFFIX: &str = "_cr.json";
 
     let final_output_path = if output_path.is_dir() {
         let input_stem = input_path
@@ -715,7 +583,7 @@ fn extract_manifest(input_path: &Path, output_path: &Path, format: ExtractFormat
             .context("Input file has no filename")?
             .to_str()
             .context("Invalid UTF-8 in filename")?;
-        output_path.join(format!("{}{}", input_stem, suffix))
+        output_path.join(format!("{}{}", input_stem, SUFFIX))
     } else {
         output_path.to_path_buf()
     };
@@ -841,7 +709,7 @@ fn process_single_file(
     Ok(())
 }
 
-/// Validate JSON files against a schema (indicators or crJSON).
+/// Validate JSON files against the crJSON schema.
 fn validate_json_files(
     input_paths: &[PathBuf],
     schema_path: &Path,
@@ -988,41 +856,17 @@ fn main() -> Result<()> {
 
     println!("Found {} input file(s) to process", input_files.len());
 
-    // Handle validation mode
+    // Handle validation mode (validates against crJSON schema)
     if cli.validate {
-        // In validation mode, input files should be JSON files to validate.
-        // Use crJSON schema when --crjson is set, otherwise indicators schema.
-        let (schema_path, schema_label) = if cli.crjson {
-            (crtool::crjson_schema_path(), "crJSON")
-        } else {
-            (crtool::default_schema_path(), "indicators")
-        };
-        return validate_json_files(&input_files, &schema_path, schema_label);
+        let schema_path = crtool::crjson_schema_path();
+        return validate_json_files(&input_files, &schema_path, "crJSON");
     }
 
-    // Handle extract mode
+    // Handle extract mode (always outputs crJSON)
     if cli.extract {
         let output = cli
             .output
             .context("--output is required when using --extract mode")?;
-
-        if cli.jpt && cli.crjson {
-            anyhow::bail!("--jpt and --crjson are mutually exclusive; use only one");
-        }
-
-        let extract_format = if cli.crjson {
-            ExtractFormat::CrJson
-        } else if cli.jpt {
-            ExtractFormat::Jpt
-        } else {
-            ExtractFormat::Default
-        };
-
-        if cli.jpt {
-            println!("Using JPEG Trust format for extraction");
-        } else if cli.crjson {
-            println!("Using crJSON format for extraction");
-        }
 
         if input_files.len() > 1 && !output.is_dir() {
             anyhow::bail!(
@@ -1035,7 +879,7 @@ fn main() -> Result<()> {
         let mut error_count = 0;
 
         for input_file in &input_files {
-            match extract_manifest(input_file, &output, extract_format) {
+            match extract_manifest(input_file, &output) {
                 Ok(_) => success_count += 1,
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);
@@ -1054,13 +898,6 @@ fn main() -> Result<()> {
         }
 
         return Ok(());
-    }
-
-    if cli.jpt {
-        anyhow::bail!("--jpt can only be used with --extract mode");
-    }
-    if cli.crjson {
-        anyhow::bail!("--crjson can only be used with --extract or --validate mode");
     }
 
     // Normal signing mode - validate required arguments
@@ -1195,16 +1032,14 @@ mod tests {
 
     #[test]
     fn test_validate_json_files_with_valid_manifest() {
-        // Test with a valid example manifest (workspace root examples/)
+        // Test with a C2PA manifest template (not crJSON); validation against crJSON schema should fail
         let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../examples")
             .join("simple_manifest.json");
 
         if manifest_path.exists() {
-            let schema_path = crtool::default_schema_path();
-            let result = validate_json_files(&[manifest_path.clone()], &schema_path, "indicators");
-            // Note: This will fail since simple_manifest.json doesn't conform to indicators schema
-            // That's expected - it's a C2PA manifest template, not an indicators document
+            let schema_path = crtool::crjson_schema_path();
+            let result = validate_json_files(&[manifest_path.clone()], &schema_path, "crJSON");
             assert!(result.is_err());
         }
     }
@@ -1220,9 +1055,8 @@ mod tests {
         writeln!(file, "{{ invalid json }}").expect("Failed to write temp file");
         drop(file);
 
-        let schema_path = crtool::default_schema_path();
-        let result =
-            validate_json_files(std::slice::from_ref(&temp_file), &schema_path, "indicators");
+        let schema_path = crtool::crjson_schema_path();
+        let result = validate_json_files(std::slice::from_ref(&temp_file), &schema_path, "crJSON");
         assert!(result.is_err());
 
         // Clean up
@@ -1232,8 +1066,8 @@ mod tests {
     #[test]
     fn test_validate_json_files_with_nonexistent_file() {
         let nonexistent = PathBuf::from("/nonexistent/file.json");
-        let schema_path = crtool::default_schema_path();
-        let result = validate_json_files(&[nonexistent], &schema_path, "indicators");
+        let schema_path = crtool::crjson_schema_path();
+        let result = validate_json_files(&[nonexistent], &schema_path, "crJSON");
         assert!(result.is_err());
     }
 }

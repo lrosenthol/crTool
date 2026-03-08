@@ -30,9 +30,9 @@ fn fixtures_dir() -> PathBuf {
 }
 
 #[test]
-fn test_validation_with_valid_indicators() -> Result<()> {
+fn test_validation_with_valid_crjson() -> Result<()> {
     let binary = get_binary_path();
-    let valid_file = fixtures_dir().join("valid_indicators.json");
+    let valid_file = fixtures_dir().join("minimal_valid_crjson.json");
 
     assert!(valid_file.exists(), "Test fixture file should exist");
 
@@ -47,16 +47,16 @@ fn test_validation_with_valid_indicators() -> Result<()> {
 
     assert!(
         output.status.success(),
-        "Validation should succeed for valid indicators file"
+        "Validation should succeed for valid crJSON file"
     );
 
     Ok(())
 }
 
 #[test]
-fn test_validation_with_minimal_valid_indicators() -> Result<()> {
+fn test_validation_with_minimal_valid_crjson() -> Result<()> {
     let binary = get_binary_path();
-    let valid_file = fixtures_dir().join("minimal_valid_indicators.json");
+    let valid_file = fixtures_dir().join("minimal_valid_crjson.json");
 
     assert!(valid_file.exists(), "Test fixture file should exist");
 
@@ -71,15 +71,16 @@ fn test_validation_with_minimal_valid_indicators() -> Result<()> {
 
     assert!(
         output.status.success(),
-        "Validation should succeed for minimal valid indicators file"
+        "Validation should succeed for minimal valid crJSON file"
     );
 
     Ok(())
 }
 
 #[test]
-fn test_validation_with_invalid_indicators() -> Result<()> {
+fn test_validation_with_invalid_crjson() -> Result<()> {
     let binary = get_binary_path();
+    // Use indicators-format file; it does not conform to crJSON schema
     let invalid_file = fixtures_dir().join("invalid_indicators.json");
 
     assert!(invalid_file.exists(), "Test fixture file should exist");
@@ -95,7 +96,7 @@ fn test_validation_with_invalid_indicators() -> Result<()> {
 
     assert!(
         !output.status.success(),
-        "Validation should fail for invalid indicators file"
+        "Validation should fail for file that does not conform to crJSON schema"
     );
 
     Ok(())
@@ -133,16 +134,14 @@ fn test_validation_with_malformed_json() -> Result<()> {
 #[test]
 fn test_validation_with_multiple_files() -> Result<()> {
     let binary = get_binary_path();
-    let valid_file = fixtures_dir().join("valid_indicators.json");
-    let minimal_file = fixtures_dir().join("minimal_valid_indicators.json");
+    let valid_file = fixtures_dir().join("minimal_valid_crjson.json");
 
     assert!(valid_file.exists(), "Test fixture file should exist");
-    assert!(minimal_file.exists(), "Test fixture file should exist");
 
     let output = Command::new(&binary)
         .arg("--validate")
         .arg(&valid_file)
-        .arg(&minimal_file)
+        .arg(&valid_file)
         .output()
         .expect("Failed to execute command");
 
@@ -160,7 +159,7 @@ fn test_validation_with_multiple_files() -> Result<()> {
 #[test]
 fn test_validation_with_mixed_valid_invalid_files() -> Result<()> {
     let binary = get_binary_path();
-    let valid_file = fixtures_dir().join("valid_indicators.json");
+    let valid_file = fixtures_dir().join("minimal_valid_crjson.json");
     let invalid_file = fixtures_dir().join("invalid_indicators.json");
 
     assert!(valid_file.exists(), "Test fixture file should exist");
@@ -220,7 +219,7 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
         return Ok(());
     }
 
-    // Look for any extracted manifest JSON files
+    // Look for extracted crJSON manifest files
     let extracted_manifests: Vec<PathBuf> = fs::read_dir(&test_output_dir)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
@@ -229,7 +228,7 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
                 && path
                     .file_name()
                     .and_then(|n| n.to_str())
-                    .map(|n| n.ends_with("_manifest_jpt.json") || n.ends_with("_manifest.json"))
+                    .map(|n| n.ends_with("_cr.json"))
                     .unwrap_or(false)
         })
         .map(|entry| entry.path())
@@ -244,7 +243,7 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
     let first_manifest = &extracted_manifests[0];
 
     println!(
-        "Testing validation with extracted manifest: {:?}",
+        "Testing validation with extracted crJSON manifest: {:?}",
         first_manifest
     );
 
@@ -257,10 +256,8 @@ fn test_validation_extracts_from_signed_file() -> Result<()> {
     println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
     println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
 
-    // Extracted manifests should be valid indicators documents
-    // Note: This might fail if the extraction format doesn't match the indicators schema
     println!(
-        "Validation result for extracted manifest: {}",
+        "Validation result for extracted crJSON manifest: {}",
         if output.status.success() {
             "PASSED"
         } else {

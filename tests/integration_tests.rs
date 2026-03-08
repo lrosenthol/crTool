@@ -38,25 +38,6 @@ fn generate_output_name(input: &Path, manifest_type: &str, subdir: Option<&str>)
     }
 }
 
-/// Generate output filename from manifest type & input extension (used by test_testset_manifests when jpeg_trust is enabled).
-#[cfg(feature = "jpeg_trust")]
-fn generate_output_name_no_stem(
-    input: &Path,
-    manifest_type: &str,
-    subdir: Option<&str>,
-) -> PathBuf {
-    let ext = input.extension().unwrap().to_str().unwrap();
-    let filename = format!("{}.{}", manifest_type, ext);
-
-    if let Some(sub) = subdir {
-        let dir = output_dir().join(sub);
-        std::fs::create_dir_all(&dir).expect("Failed to create subdirectory");
-        dir.join(filename)
-    } else {
-        output_dir().join(filename)
-    }
-}
-
 // Tests for Dog.jpg
 #[test]
 fn test_dog_jpg_simple_manifest() -> Result<()> {
@@ -986,22 +967,21 @@ fn test_extract_manifest_to_specific_file() -> Result<()> {
 
     sign_file_with_manifest(&input, &signed_output, &manifest)?;
 
-    // Now extract the manifest to a specific JSON file
+    // Now extract the manifest to a specific JSON file (crJSON)
     let json_output = output_dir().join("extracted/extracted_manifest.json");
-    common::extract_manifest_to_file(&signed_output, &json_output)?;
+    common::extract_manifest_to_file_crjson(&signed_output, &json_output)?;
 
     // Verify the JSON file was created
     assert!(json_output.exists(), "Extracted JSON file should exist");
 
-    // Verify the JSON file is valid and contains expected data
+    // Verify the JSON file is valid crJSON
     let json_content = fs::read_to_string(&json_output)?;
     let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
 
-    // Check that it has the expected structure
     assert!(json_value.is_object(), "JSON should be an object");
     assert!(
-        json_value.get("manifests").is_some() || json_value.get("active_manifest").is_some(),
-        "JSON should contain manifest data"
+        json_value.get("@context").is_some() && json_value.get("manifests").is_some(),
+        "JSON should be crJSON with @context and manifests"
     );
 
     println!(
@@ -1026,10 +1006,9 @@ fn test_extract_manifest_to_directory() -> Result<()> {
     let extract_dir = output_dir().join("extracted");
     fs::create_dir_all(&extract_dir)?;
 
-    // Extract the manifest to the directory
-    // The helper will create a filename based on the input
-    let expected_json = extract_dir.join("Dog_extract_dir_test_manifest.json");
-    common::extract_manifest_to_file(&signed_output, &expected_json)?;
+    // Extract the manifest to the directory (crJSON)
+    let expected_json = extract_dir.join("Dog_extract_dir_test_cr.json");
+    common::extract_manifest_to_file_crjson(&signed_output, &expected_json)?;
 
     // Verify the JSON file was created in the directory
     assert!(
@@ -1037,27 +1016,20 @@ fn test_extract_manifest_to_directory() -> Result<()> {
         "Extracted JSON file should exist in directory"
     );
 
-    // Verify the JSON file is valid
+    // Verify the JSON file is valid crJSON
     let json_content = fs::read_to_string(&expected_json)?;
     let json_value: serde_json::Value = serde_json::from_str(&json_content)?;
 
     assert!(json_value.is_object(), "JSON should be an object");
-
-    // Verify it contains the title from the full_manifest.json
-    if let Some(manifests) = json_value.get("manifests").and_then(|m| m.as_object()) {
-        // The manifests object contains manifest labels as keys
-        let has_title = manifests.values().any(|manifest| {
-            manifest
-                .get("title")
-                .and_then(|t| t.as_str())
-                .map(|s| s.contains("Edited Photo"))
-                .unwrap_or(false)
-        });
-        assert!(
-            has_title,
-            "Manifest should contain title from full_manifest.json"
-        );
-    }
+    assert!(
+        json_value.get("@context").is_some(),
+        "Extracted output should have @context (crJSON)"
+    );
+    let manifests = json_value
+        .get("manifests")
+        .and_then(|m| m.as_array())
+        .expect("crJSON should have manifests array");
+    assert!(!manifests.is_empty(), "Should have at least one manifest");
 
     println!(
         "✓ Successfully extracted manifest to directory: {}",
@@ -1868,11 +1840,11 @@ fn test_multiple_files_extract() -> Result<()> {
     );
 
     // Verify manifest files were created
-    let manifest1 = extract_dir.join("Dog_signed_manifest.json");
+    let manifest1 = extract_dir.join("Dog_signed_cr.json");
 
     assert!(
         manifest1.exists(),
-        "Manifest file Dog_signed_manifest.json should exist"
+        "Manifest file Dog_signed_cr.json should exist"
     );
     // Note: Both files will have the same name since they're both "Dog_signed"
     // In a real scenario, you'd want different filenames
@@ -1977,220 +1949,6 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
     Ok(())
 }
 
-/// Signs testset manifests and extracts with --jpt; requires JpegTrustReader. Skipped when feature "jpeg_trust" is not enabled.
-#[test]
-#[cfg(feature = "jpeg_trust")]
-fn test_testset_manifests() -> Result<()> {
-    use std::process::Command;
-
-    let manifest_names = vec![
-        "n-actions-created-gathered",
-        "n-actions-inception",
-        "n-actions-inception-multiple",
-        "n-actions-created-nodst",
-        "n-actions-opened",
-        "n-actions-placed",
-        "n-actions-placed-parent",
-        "n-actions-removed",
-        "n-actions-removed-same-manifest",
-        "n-actions-translated",
-        "n-actions-redacted",
-        "n-actions-redacted-bad-uri",
-        "n-actions-redacted-bad-reason",
-        "n-actions-redacted-no-reason",
-        "n-actions-watermarked-bound",
-        "n-actions-softwareAgent-missing",
-        "n-actions-softwareAgent-and-index",
-        "p-actions-created",
-        "p-actions-created-with-custom",
-        "p-actions-created-with-icon",
-        "p-actions-created-filtered",
-        "p-actions-opened-manifest",
-        "p-actions-opened-manifest-invalid",
-        "p-actions-opened-no-manifest",
-        "p-actions-opened-no-manifest-metadata",
-        "p-actions-placed",
-        "p-actions-placed-manifest",
-        "p-actions-placed-manifest-metadata",
-        "p-actions-translated",
-        // "p-actions-redacted",
-        "p-actions-softwareAgents",
-        "p-actions-template",
-        "p-actions-template-all",
-        "p-actions-template-icon",
-        "p-actions-related",
-        // Skipped: c2pa-rs fails to decode c2pa.actions.v2 with spatial change regions
-        // "p-actions-changes-spatial",
-        "p-actions-watermarked-unbound",
-        "p-actions-watermarked-bound",
-        "p-soft-binding",
-        "p-adobe.parent-lineage",
-    ];
-
-    let mut success_count = 0;
-    let mut total_count = 0;
-
-    let input = common::testfiles_dir().join("Dog.jpg");
-
-    // Clean the testset output directory before starting tests to ensure a fresh state.
-    {
-        let testset_dir = output_dir().join("testset");
-        if testset_dir.exists() {
-            for entry in std::fs::read_dir(&testset_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_file() {
-                    std::fs::remove_file(&path)?;
-                } else if path.is_dir() {
-                    std::fs::remove_dir_all(&path)?;
-                }
-            }
-        } else {
-            std::fs::create_dir_all(&testset_dir)?;
-        }
-    }
-
-    // Process each manifest in the testset
-    for manifest_name in &manifest_names {
-        let manifest_path = common::testset_dir().join(format!("{}.json", manifest_name));
-        total_count += 1;
-        // Use "testset" subdirectory to avoid conflicts with individual tests
-        let output = generate_output_name_no_stem(&input, manifest_name, Some("testset"));
-
-        match sign_file_with_manifest(&input, &output, &manifest_path) {
-            Ok(_) => match verify_signed_file(&output) {
-                Ok(_) => {
-                    success_count += 1;
-                    println!(
-                        "✓ Created {} from {} + {}",
-                        output.file_name().unwrap().to_str().unwrap(),
-                        input.file_name().unwrap().to_str().unwrap(),
-                        manifest_name
-                    );
-                }
-                Err(e) => {
-                    eprintln!("✗ Verification failed for {:?}: {}", output, e);
-                }
-            },
-            Err(e) => {
-                eprintln!(
-                    "✗ Signing failed for {:?} with {}: {}",
-                    input, manifest_name, e
-                );
-            }
-        }
-
-        {
-            // Now extract the newly created manifest into JSON
-            let binary_path = common::cli_binary_path();
-            let output_testset_dir = output_dir().join("testset");
-
-            let result = Command::new(&binary_path)
-                .arg("--extract")
-                .arg("--jpt")
-                .arg(&output)
-                .arg("--output")
-                .arg(&output_testset_dir)
-                .output()?;
-
-            if result.status.success() {
-                println!(
-                    "✓ Extraction of manifest from {:?}",
-                    output.file_name().unwrap().to_str().unwrap(),
-                );
-
-                // Now validate the extracted JSON file
-                let extracted_json =
-                    output_testset_dir.join(format!("{}_manifest_jpt.json", manifest_name));
-
-                if extracted_json.exists() {
-                    let validate_result = Command::new(&binary_path)
-                        .arg("--validate")
-                        .arg(&extracted_json)
-                        .output()?;
-
-                    if validate_result.status.success() {
-                        println!(
-                            "✓ Validation passed for extracted manifest: {}",
-                            extracted_json.file_name().unwrap().to_str().unwrap()
-                        );
-                    } else {
-                        println!(
-                            "✗ Validation failed for {:?}: {}",
-                            extracted_json,
-                            String::from_utf8_lossy(&validate_result.stderr)
-                        );
-                    }
-
-                    // For icon manifest: verify proper icon URI (with '/') and presence of c2pa.icon assertion.
-                    // Apply library normalizer so we verify expected structure regardless of CLI binary freshness.
-                    if *manifest_name == "p-actions-created-with-icon" {
-                        let content = std::fs::read_to_string(&extracted_json)?;
-                        let mut j: serde_json::Value = serde_json::from_str(&content)?;
-                        crtool::normalize_jpt_jumbf_identifiers(&mut j);
-                        let manifests = j
-                            .get("manifests")
-                            .and_then(|m| m.as_array())
-                            .expect("JPT should have manifests array");
-                        let manifest = manifests
-                            .first()
-                            .expect("should have at least one manifest");
-                        let claim_v2 = manifest
-                            .get("claim.v2")
-                            .expect("manifest should have claim.v2");
-                        let cgi = claim_v2
-                            .get("claim_generator_info")
-                            .and_then(|c| c.as_array())
-                            .and_then(|a| a.first())
-                            .expect("p-actions-created-with-icon should have claim_generator_info with icon");
-                        let icon_id = cgi
-                            .get("icon")
-                            .and_then(|i| i.get("identifier"))
-                            .and_then(|s| s.as_str())
-                            .expect("claim_generator_info should have icon.identifier");
-                        assert!(
-                            icon_id.contains('/') && icon_id.contains("self#jumbf=/c2pa/"),
-                            "icon identifier should be a proper URI with slashes (or normalize to one), got: {}",
-                            icon_id
-                        );
-                        let assertions = manifest
-                            .get("assertions")
-                            .and_then(|a| a.as_object())
-                            .expect("manifest should have assertions object");
-                        if assertions.contains_key("c2pa.icon") {
-                            println!(
-                                "  ✓ Icon manifest: proper URI and c2pa.icon assertion present"
-                            );
-                        } else {
-                            // c2pa-rs JPT export may not yet include gathered assertions (e.g. c2pa.icon) in the assertions object; URI is still verified.
-                            println!(
-                                "  ✓ Icon manifest: proper URI (c2pa.icon assertion not in assertions object; keys: {:?})",
-                                assertions.keys().collect::<Vec<_>>()
-                            );
-                        }
-                    }
-                } else {
-                    println!("⚠ Extracted JSON file not found: {:?}", extracted_json);
-                }
-            } else {
-                println!(
-                    "✗ Extraction failed for {:?}: {}",
-                    output,
-                    String::from_utf8_lossy(&result.stderr)
-                );
-            }
-        }
-    }
-
-    println!("\n{}/{} tests passed", success_count, total_count);
-    assert_eq!(
-        success_count, total_count,
-        "All image/manifest combinations should succeed"
-    );
-
-    Ok(())
-}
-
 /// Signs testset manifests and extracts crJSON via library (CrJsonReader), then validates with crJSON schema. No CLI dependency.
 #[test]
 fn test_testset_manifests_crjson() -> Result<()> {
@@ -2287,8 +2045,7 @@ fn test_testset_manifests_crjson() -> Result<()> {
                     output.file_name().unwrap().to_str().unwrap(),
                 );
 
-                let extracted_json =
-                    testset_dir.join(format!("{}_manifest_crjson.json", manifest_name));
+                let extracted_json = testset_dir.join(format!("{}_cr.json", manifest_name));
                 std::fs::write(&extracted_json, &extraction.manifest_json)?;
 
                 let schema_path = crtool::crjson_schema_path();

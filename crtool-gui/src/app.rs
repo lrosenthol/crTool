@@ -27,8 +27,8 @@ fn save_manifest_as(tab: &DocumentTab, manifest: &ManifestExtractionResult) -> b
         .file_path
         .file_stem()
         .and_then(|s| s.to_str())
-        .map(|s| format!("{}-indicators.json", s))
-        .unwrap_or_else(|| "manifest-indicators.json".to_string());
+        .map(|s| format!("{}-manifest.json", s))
+        .unwrap_or_else(|| "manifest.json".to_string());
     if let Some(save_path) = rfd::FileDialog::new()
         .set_file_name(&default_name)
         .add_filter("JSON", &["json"])
@@ -180,8 +180,8 @@ impl eframe::App for CrtoolApp {
                             .file_path
                             .file_stem()
                             .and_then(|s| s.to_str())
-                            .map(|s| format!("{}-indicators.json", s))
-                            .unwrap_or_else(|| "manifest-indicators.json".to_string());
+                            .map(|s| format!("{}-manifest.json", s))
+                            .unwrap_or_else(|| "manifest.json".to_string());
                         if let Some(save_path) = rfd::FileDialog::new()
                             .set_file_name(&default_name)
                             .add_filter("JSON", &["json"])

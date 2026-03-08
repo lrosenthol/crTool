@@ -24,7 +24,7 @@ cargo test test_dog_png
 ## Test layout
 
 - **tests/integration_tests.rs** — Sign test images (Dog.jpg, Dog.png, Dog.webp) with simple/full manifests, verify output.
-- **tests/test_crjson_extraction.rs**, **test_jpt_extraction.rs**, **test_validation.rs** — Extraction and schema validation.
+- **tests/test_crjson_extraction.rs**, **test_validation.rs** — Extraction and schema validation.
 - **tests/common/mod.rs** — Helpers and fixture checks (e.g. `test_fixtures_exist`, `test_certs_exist`).
 
 Successful integration tests write signed images to `target/test_output/` (e.g. `Dog_simple.jpg`, `Dog_full.png`).

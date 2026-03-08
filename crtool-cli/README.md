@@ -22,11 +22,9 @@ Full option list and examples are in the root [README](../README.md). Key option
 | `-m, --manifest <FILE>` | JSON manifest config (required for signing) |
 | `-o, --output <PATH>` | Output file or directory (required for signing/extract) |
 | `-c, --cert`, `-k, --key` | Certificate and private key (required for signing) |
-| `-e, --extract` | Extract manifest to JSON (read-only) |
-| `--jpt` | JPEG Trust format for extraction (with `--extract`) |
-| `--crjson` | crJSON format for extraction, or crJSON schema for validation (with `--extract` or `-v`) |
+| `-e, --extract` | Extract manifest to crJSON (read-only) |
 | `--trust` | Enable C2PA and Content Credentials trust list validation for extract/read |
-| `-v, --validate` | Validate JSON files against indicators or crJSON schema |
+| `-v, --validate` | Validate JSON files against crJSON schema |
 | `--allow-self-signed` | Allow self-signed certs (testing only) |
 | `--ingredients-dir <DIR>` | Base dir for `ingredients_from_files` paths |
 | `--thumbnail-asset`, `--thumbnail-ingredients` | Generate thumbnails |

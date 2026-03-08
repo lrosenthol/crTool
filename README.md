@@ -14,8 +14,8 @@ A Rust-based tool (CLI and GUI) that uses the [c2pa-rs](https://github.com/conte
 - 🖼️ Support for multiple media formats (JPEG, PNG, and more)
 - 📁 Flexible output options (specific file or directory)
 - 🧩 **File-based ingredient loading** - automatically load and embed parent/component ingredients from files
-- 📤 **Extract manifests** - extract C2PA manifests from signed files to JSON (standard or JPEG Trust format)
-- ✅ **JSON Schema validation** - validate extracted manifests or indicators documents against the JPEG Trust schema
+- 📤 **Extract manifests** - extract C2PA manifests from signed files to JSON (standard or crJSON format)
+- ✅ **JSON Schema validation** - validate extracted crJSON manifests against the crJSON schema
 - ⚡ Built with Rust for performance and safety
 
 ## Installation
@@ -103,23 +103,13 @@ crTool \
 - `-a, --algorithm <ALGORITHM>`: Signing algorithm (optional, auto-detected from certificate if not specified)
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
   - Auto-detection examines the certificate to determine the appropriate algorithm
-- `-e, --extract`: Extract manifest from input file to JSON (read-only mode, no signing)
-- `--jpt`: Use JPEG Trust format for extraction (only valid with `--extract`)
-  - Outputs manifest data in the JPEG Trust JSON format as defined in the JPEG Trust specification
-  - Includes `@context` field with JPEG Trust vocabulary
-  - Includes computed asset hash in `asset_info`
-  - Formats manifests as an array instead of an object
-  - Different validation status structure compared to standard format
-- `--crjson`: Use crJSON format for extraction (only valid with `--extract`), or use crJSON schema when validating (with `-v/--validate`). Mutually exclusive with `--jpt`
-  - With `--extract`: outputs manifest in Content Credentials crJSON format with `validationResults` (e.g. `signingCredential.trusted` / `signingCredential.untrusted`)
-  - With `--validate`: validates input JSON against `INTERNAL/schemas/crJSON-schema.json`
+- `-e, --extract`: Extract manifest from input file to crJSON (read-only mode, no signing). Output is always Content Credentials crJSON format.
 - `--trust`: Enable trust list validation for extract/read operations (default: false)
   - Fetches and applies the official [C2PA trust list](https://github.com/c2pa-org/conformance-public/tree/main/trust-list) and the [Content Credentials interim trust list](https://contentcredentials.org/trust)
   - When set, extraction uses these lists so output includes trust status (e.g. `signingCredential.trusted` in crJSON)
   - Requires network access on first run to download the lists
-- `-v, --validate`: Validate JSON files against the JPEG Trust indicators schema (or crJSON schema when `--crjson` is set)
-  - Validates one or more JSON files against the schema at `INTERNAL/schemas/indicators-schema.json`
-  - Useful for validating extracted manifests or custom indicators documents
+- `-v, --validate`: Validate JSON files against the crJSON schema
+  - Validates one or more JSON files against `INTERNAL/schemas/crJSON-schema.json`
   - Provides detailed error messages for validation failures
   - Returns exit code 0 if all files are valid, non-zero otherwise
 - `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
@@ -230,108 +220,60 @@ When processing multiple files, output **must** be a directory:
 
 ### Extracting Manifests
 
-You can extract existing C2PA manifests from signed files using the `-e/--extract` option. This is useful for inspecting, analyzing, or archiving manifest data:
+You can extract existing C2PA manifests from signed files using the `-e/--extract` option. Output is always Content Credentials crJSON format:
 
 ```bash
-# Extract from a single file to a specific file (standard format)
+# Extract from a single file to a specific file
 ./target/release/crTool \
   -e signed_image.jpg \
   --output manifest.json
 
-# Extract in JPEG Trust format
-./target/release/crTool \
-  -e --jpt signed_image.jpg \
-  --output manifest_jpt.json
-
-# Extract from a single file to a directory (auto-generates filename based on input)
+# Extract from a single file to a directory (auto-generates filename)
 ./target/release/crTool \
   -e signed_image.jpg \
   --output output_directory/
-# Creates: output_directory/signed_image_manifest.json
-
-# Extract in JPEG Trust format to a directory
-./target/release/crTool \
-  -e --jpt signed_image.jpg \
-  --output output_directory/
-# Creates: output_directory/signed_image_manifest_jpt.json
+# Creates: output_directory/signed_image_cr.json
 
 # Extract from multiple files (output must be a directory)
 ./target/release/crTool \
   -e "output/*.jpg" \
   --output manifests/
-# Creates: manifests/image1_manifest.json, manifests/image2_manifest.json, etc.
-
-# Extract from multiple files in JPEG Trust format
-./target/release/crTool \
-  -e --jpt "output/*.jpg" \
-  --output manifests/
-# Creates: manifests/image1_manifest_jpt.json, manifests/image2_manifest_jpt.json, etc.
-
-# Extract in crJSON format (Content Credentials format with validationResults)
-./target/release/crTool \
-  -e --crjson signed_image.jpg \
-  --output output_directory/
-# Creates: output_directory/signed_image_manifest_crjson.json
+# Creates: manifests/image1_cr.json, manifests/image2_cr.json, etc.
 
 # Extract with trust list validation (reports signingCredential.trusted / untrusted)
 ./target/release/crTool \
-  -e --crjson --trust signed_image.jpg \
+  -e --trust signed_image.jpg \
   --output output_directory/
 ```
 
 In extract mode:
 - No certificate, key, or manifest file is required
-- The tool reads the C2PA manifest from the input file using the c2pa-rs Reader
-- The manifest is exported as formatted JSON
-- If the output is a directory, the filename is auto-generated as:
-  - `{input_stem}_manifest.json` for standard format
-  - `{input_stem}_manifest_jpt.json` for JPEG Trust format
-  - `{input_stem}_manifest_crjson.json` for crJSON format
-- The extracted JSON contains the complete manifest store including all assertions, signatures, and metadata
-
-**crJSON format** (`--crjson` with `--extract`):
-- Outputs Content Credentials crJSON with `@context`, `manifests`, and `validationResults`
+- The tool outputs crJSON with `@context`, `manifests`, and `validationResults`
+- If the output is a directory, the filename is auto-generated as `{input_stem}_cr.json`
 - Use `--trust` to validate signing certificates against the C2PA and Content Credentials trust lists; output will include `signingCredential.trusted` or `signingCredential.untrusted` in `validationResults`
-
-**JPEG Trust Format** (`--jpt`):
-- Use the `--jpt` flag to extract in JPEG Trust format
-- This format follows the JPEG Trust specification with:
-  - `@context` field with JPEG Trust vocabulary reference
-  - `asset_info` with computed SHA-256 hash of the asset
-  - `manifests` as an array (not an object)
-  - Different validation status structure
-  - Compatible with JPEG Trust consumers and validators
-
 
 ### Validating JSON Files
 
-The tool can validate JSON files against the JPEG Trust indicators schema. This is useful for:
-- Verifying extracted manifests conform to the indicators specification
-- Validating custom indicators documents before processing
-- Checking JSON files for compliance with the JPEG Trust standard
+The tool validates JSON files against the crJSON schema. Use `--validate` for one or more JSON files (e.g. extracted manifests):
 
 ```bash
-# Validate a single JSON file
+# Validate a single file
 ./target/release/crTool \
-  --validate extracted_manifest.json
+  --validate manifest.json
 
-# Validate multiple JSON files
+# Validate multiple files
 ./target/release/crTool \
-  --validate manifest1.json manifest2.json manifest3.json
+  --validate manifest1.json manifest2.json
 
 # Validate using glob patterns
 ./target/release/crTool \
   --validate "manifests/*.json"
-
-# Validate against crJSON schema instead of indicators schema
-./target/release/crTool \
-  --validate --crjson manifest_crjson.json
 ```
 
 In validation mode:
 - No `--output` flag is required (validation doesn't produce any files)
-- By default the tool loads the indicators schema from `INTERNAL/schemas/indicators-schema.json`; use `--crjson` to validate against `INTERNAL/schemas/crJSON-schema.json` instead
-- Each input file is validated against the chosen schema
+- The tool validates against `INTERNAL/schemas/crJSON-schema.json`
+- Each input file is validated against the crJSON schema
 - Detailed error messages are provided for validation failures, including:
   - The path in the JSON where the error occurred
   - A description of what is invalid
@@ -340,9 +282,9 @@ In validation mode:
 
 Example output for a valid file:
 ```
-=== Validating JSON files against indicators schema ===
+=== Validating JSON files against crJSON schema ===
 
-Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
 
@@ -359,9 +301,9 @@ Validating: "manifest.json"
 
 Example output for an invalid file:
 ```
-=== Validating JSON files against indicators schema ===
+=== Validating JSON files against crJSON schema ===
 
-Loading schema from: "INTERNAL/schemas/indicators-schema.json"
+Loading schema from: "INTERNAL/schemas/crJSON-schema.json"
 
 Schema compiled successfully
 
@@ -694,7 +636,7 @@ Extract a manifest from a signed file:
   --output output/extracted_manifest.json
 ```
 
-Validate JSON files against the indicators schema:
+Validate JSON files against the crJSON schema:
 
 ```bash
 # Validate a single file
