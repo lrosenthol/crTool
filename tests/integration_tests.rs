@@ -1949,7 +1949,7 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
     Ok(())
 }
 
-/// Signs testset manifests and extracts crJSON via library (CrJsonReader), then validates with crJSON schema. No CLI dependency.
+/// Signs testset manifests and extracts crJSON via library (Reader::crjson), then validates with crJSON schema. No CLI dependency.
 #[test]
 fn test_testset_manifests_crjson() -> Result<()> {
     let manifest_names = vec![

@@ -15,8 +15,10 @@ governing permissions and limitations under the License.
 //! Core library for extracting and validating C2PA manifests in crJSON format.
 
 use anyhow::{Context, Result};
-use c2pa::settings::Settings;
-use c2pa::CrJsonReader;
+use c2pa::{Context as C2paContext, Reader};
+
+/// Re-export so callers (e.g. GUI, CLI) can use explicit Settings without depending on c2pa.
+pub use c2pa::Settings;
 
 /// File extensions for asset types supported by c2pa-rs for reading/embedding C2PA manifests.
 /// Matches the formats listed in c2pa-rs [supported-formats](https://github.com/contentauth/c2pa-rs/blob/main/docs/supported-formats.md).
@@ -160,7 +162,57 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Extract a C2PA manifest from a file in crJSON format using the c2pa-rs CrJsonReader.
+/// Extracts a C2PA manifest in crJSON format using the given Settings (e.g. trust configuration).
+/// Use this when you have explicit settings so that trust validation uses the same configuration
+/// regardless of thread (avoids thread-local timing/threading issues).
+pub fn extract_crjson_manifest_with_settings<P: AsRef<Path>>(
+    input_path: P,
+    settings: &Settings,
+) -> Result<ManifestExtractionResult> {
+    let input_path = input_path.as_ref();
+
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    let context = C2paContext::new()
+        .with_settings(settings)
+        .map_err(|e| anyhow::anyhow!("Invalid settings: {}", e))?;
+    let reader = Reader::from_context(context)
+        .with_file(input_path)
+        .context(
+            "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+        )?;
+
+    let active_label = reader
+        .active_label()
+        .context("No active C2PA manifest found in the input file")?
+        .to_string();
+
+    let manifest_json = reader.crjson();
+
+    let mut manifest_value: serde_json::Value =
+        serde_json::from_str(&manifest_json).context("Failed to parse extracted crJSON")?;
+
+    normalize_crjson_validation_results(&mut manifest_value);
+
+    let manifest_json = serde_json::to_string_pretty(&manifest_value)
+        .context("Failed to re-serialize crJSON after normalization")?;
+
+    Ok(ManifestExtractionResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        active_label,
+        asset_hash: None,
+        manifest_json,
+        manifest_value,
+    })
+}
+
+/// Extract a C2PA manifest from a file in crJSON format using the c2pa-rs Reader.
+///
+/// Uses **thread-local** Settings. If you have applied trust via [`apply_trust_settings`],
+/// ensure extraction runs on the same thread. Prefer [`extract_crjson_manifest_with_settings`]
+/// when you have explicit settings so trust is applied consistently.
 ///
 /// # Arguments
 ///
@@ -169,7 +221,7 @@ pub struct ValidationError {
 /// # Returns
 ///
 /// A `ManifestExtractionResult` containing the extracted manifest data in crJSON format.
-/// `asset_hash` is not computed by CrJsonReader and will be `None`.
+/// `asset_hash` is not computed and will be `None`.
 ///
 /// # Errors
 ///
@@ -184,17 +236,16 @@ pub fn extract_crjson_manifest<P: AsRef<Path>>(input_path: P) -> Result<Manifest
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
 
-    let crjson_reader = CrJsonReader::from_file(input_path).context(
+    let reader = Reader::from_file(input_path).context(
         "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
     )?;
 
-    let active_label = crjson_reader
-        .inner()
+    let active_label = reader
         .active_label()
         .context("No active C2PA manifest found in the input file")?
         .to_string();
 
-    let manifest_json = crjson_reader.json();
+    let manifest_json = reader.crjson();
 
     let mut manifest_value: serde_json::Value =
         serde_json::from_str(&manifest_json).context("Failed to parse extracted crJSON")?;
@@ -317,20 +368,11 @@ pub const INTERIM_ALLOWED_LIST_URL: &str =
     "https://contentcredentials.org/trust/allowed.sha256.txt";
 pub const INTERIM_TRUST_CONFIG_URL: &str = "https://contentcredentials.org/trust/store.cfg";
 
-/// Applies C2PA trust settings to the thread-local Settings used by Reader/CrJsonReader.
-/// Call this before extracting or reading manifests to validate signing certificates against the
-/// given trust anchors, optional allowed list, and optional trust config (EKU OIDs).
-///
-/// * `trust_anchors` - PEM bundle of trust anchor root certificates (required).
-/// * `allowed_list` - Optional PEM bundle or SHA256 hash list of explicitly allowed signing certificates.
-/// * `trust_config` - Optional list of allowed EKU OIDs in dot notation.
-///
-/// Also enables `verify.verify_trust` so that the SDK actually performs trust validation.
-pub fn apply_trust_settings(
+fn trust_settings_toml(
     trust_anchors: &str,
     allowed_list: Option<&str>,
     trust_config: Option<&str>,
-) -> Result<()> {
+) -> String {
     fn escape_toml_literal(s: &str) -> String {
         s.replace('\'', "''")
     }
@@ -351,6 +393,47 @@ pub fn apply_trust_settings(
         ));
     }
     toml.push_str("\n[verify]\nverify_trust = true\n");
+    toml
+}
+
+/// Builds Settings with trust validation enabled (trust anchors, optional allowed list and trust config).
+/// Does not set thread-local; use the returned Settings with [`extract_crjson_manifest_with_settings`].
+pub fn build_trust_settings(
+    trust_anchors: &str,
+    allowed_list: Option<&str>,
+    trust_config: Option<&str>,
+) -> Result<Settings> {
+    let toml = trust_settings_toml(trust_anchors, allowed_list, trust_config);
+    Settings::default()
+        .with_toml(&toml)
+        .map_err(|e| anyhow::anyhow!("Failed to build trust settings: {}", e))
+}
+
+/// Returns default Settings for extraction when trust lists are not used.
+/// Trust verification remains enabled so that claimSignature shows a trust status (trusted or untrusted);
+/// without trust anchors, certificates will report as untrusted.
+pub fn default_extraction_settings() -> Settings {
+    Settings::default()
+}
+
+/// Applies C2PA trust settings to the thread-local Settings used by Reader.
+/// Call this before extracting or reading manifests to validate signing certificates against the
+/// given trust anchors, optional allowed list, and optional trust config (EKU OIDs).
+///
+/// * `trust_anchors` - PEM bundle of trust anchor root certificates (required).
+/// * `allowed_list` - Optional PEM bundle or SHA256 hash list of explicitly allowed signing certificates.
+/// * `trust_config` - Optional list of allowed EKU OIDs in dot notation.
+///
+/// Also enables `verify.verify_trust` so that the SDK actually performs trust validation.
+///
+/// Prefer building settings with [`build_trust_settings`] and using [`extract_crjson_manifest_with_settings`]
+/// so the same settings are used regardless of thread.
+pub fn apply_trust_settings(
+    trust_anchors: &str,
+    allowed_list: Option<&str>,
+    trust_config: Option<&str>,
+) -> Result<()> {
+    let toml = trust_settings_toml(trust_anchors, allowed_list, trust_config);
     Settings::from_toml(&toml)
         .map_err(|e| anyhow::anyhow!("Failed to apply trust settings: {}", e))?;
     Ok(())
