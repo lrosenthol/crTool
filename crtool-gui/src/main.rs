@@ -25,7 +25,7 @@ mod security_scoped;
 
 use app::CrtoolApp;
 use std::path::PathBuf;
-use util::{arg_to_path, load_trust_lists_for_gui};
+use util::arg_to_path;
 
 fn main() -> Result<(), eframe::Error> {
     #[cfg(target_os = "macos")]
@@ -46,7 +46,7 @@ fn main() -> Result<(), eframe::Error> {
             egui_extras::install_image_loaders(&cc.egui_ctx);
             #[cfg(target_os = "macos")]
             macos_open_document::install_cocoa_handler();
-            load_trust_lists_for_gui();
+            let extraction_settings = util::gui_extraction_settings();
 
             let mut initial_files: Vec<PathBuf> = std::env::args()
                 .skip(1)
@@ -58,7 +58,10 @@ fn main() -> Result<(), eframe::Error> {
             #[cfg(target_os = "macos")]
             initial_files.extend(macos_open_document::drain_pending_files());
 
-            Ok(Box::new(CrtoolApp::new_with_optional_files(initial_files)))
+            Ok(Box::new(CrtoolApp::new_with_optional_files(
+                initial_files,
+                extraction_settings,
+            )))
         }),
     )
 }

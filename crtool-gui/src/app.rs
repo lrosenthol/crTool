@@ -15,7 +15,7 @@ governing permissions and limitations under the License.
 use crate::document::{self, DocumentTab};
 use crate::tab_viewer::CrtoolTabViewer;
 use crate::util;
-use crtool::{crjson_schema_path, is_supported_asset_path, ManifestExtractionResult};
+use crtool::{crjson_schema_path, is_supported_asset_path, ManifestExtractionResult, Settings};
 use eframe::egui;
 use egui_dock::{DockArea, DockState, Style};
 use egui_twemoji::EmojiLabel;
@@ -73,23 +73,29 @@ mod shortcuts {
     };
 }
 
-/// Main app state: multi-document dock and schema path.
+/// Main app state: multi-document dock, schema path, and extraction settings (trust config).
 pub(crate) struct CrtoolApp {
     /// Multi-document dock state (tabs can be undocked into separate windows).
     pub(crate) dock_state: DockState<DocumentTab>,
     /// Schema path for validation (shared).
     pub(crate) schema_path: PathBuf,
+    /// Settings used for manifest extraction (trust lists or verify_trust disabled).
+    pub(crate) extraction_settings: Settings,
 }
 
 impl CrtoolApp {
     pub(crate) fn new() -> Self {
-        Self::new_with_optional_files(Vec::new())
+        Self::new_with_optional_files(Vec::new(), util::gui_extraction_settings())
     }
 
-    pub(crate) fn new_with_optional_files(initial_files: Vec<PathBuf>) -> Self {
+    pub(crate) fn new_with_optional_files(
+        initial_files: Vec<PathBuf>,
+        extraction_settings: Settings,
+    ) -> Self {
         let mut app = Self {
             dock_state: DockState::new(Vec::new()),
             schema_path: crjson_schema_path(),
+            extraction_settings,
         };
         app.add_documents(initial_files);
         app
@@ -98,11 +104,12 @@ impl CrtoolApp {
     /// Open one or more files as new tabs (focus goes to the last opened).
     pub(crate) fn add_documents(&mut self, paths: Vec<PathBuf>) {
         let schema_path = self.schema_path.clone();
+        let settings = self.extraction_settings.clone();
         for path in paths {
             if !path.is_file() || !is_supported_asset_path(&path) {
                 continue;
             }
-            let tab = document::load_document(path, &schema_path);
+            let tab = document::load_document(path, &schema_path, &settings);
             self.dock_state.push_to_focused_leaf(tab);
         }
     }

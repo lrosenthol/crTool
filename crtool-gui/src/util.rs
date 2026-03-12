@@ -10,9 +10,10 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+use crtool::Settings;
 use crtool::{
-    apply_trust_settings, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
-    INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
+    build_trust_settings, default_extraction_settings, C2PA_TRUST_ANCHORS_URL,
+    INTERIM_ALLOWED_LIST_URL, INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
 };
 use eframe::egui;
 use egui_code_editor::Syntax;
@@ -45,8 +46,11 @@ pub(crate) fn arg_to_path(arg: &str) -> PathBuf {
     PathBuf::from(arg)
 }
 
-/// Load C2PA and Content Credentials trust lists and apply for validation. Runs at GUI startup.
-pub(crate) fn load_trust_lists_for_gui() {
+/// Build Settings for GUI extraction: trust lists when fetch succeeds, otherwise default settings.
+/// Trust verification stays enabled so claimSignature always shows trusted or untrusted.
+/// If the interim Content Credentials list fails (e.g. 404), the C2PA official list is still used
+/// so that certificates chaining to C2PA anchors show as trusted.
+pub(crate) fn gui_extraction_settings() -> Settings {
     let client = match reqwest::blocking::Client::builder()
         .user_agent("crTool-gui/1.0")
         .build()
@@ -54,7 +58,7 @@ pub(crate) fn load_trust_lists_for_gui() {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Trust lists: failed to create HTTP client: {}", e);
-            return;
+            return default_extraction_settings();
         }
     };
     let fetch = |url: &str| -> Option<String> {
@@ -68,25 +72,34 @@ pub(crate) fn load_trust_lists_for_gui() {
     };
     let c2pa_anchors = match fetch(C2PA_TRUST_ANCHORS_URL) {
         Some(s) => s,
-        None => return,
+        None => {
+            eprintln!("Trust lists: C2PA list unavailable; certificates will show as untrusted.");
+            return default_extraction_settings();
+        }
     };
-    let interim_anchors = match fetch(INTERIM_TRUST_ANCHORS_URL) {
-        Some(s) => s,
-        None => return,
+    let interim_anchors = fetch(INTERIM_TRUST_ANCHORS_URL);
+    let trust_anchors = match &interim_anchors {
+        Some(s) => format!("{}\n{}", c2pa_anchors.trim_end(), s.trim_end()),
+        None => {
+            eprintln!(
+                "Trust lists: Content Credentials interim list unavailable (e.g. {}); using C2PA list only.",
+                INTERIM_TRUST_ANCHORS_URL
+            );
+            c2pa_anchors
+        }
     };
-    let trust_anchors = format!(
-        "{}\n{}",
-        c2pa_anchors.trim_end(),
-        interim_anchors.trim_end()
-    );
     let allowed_list = fetch(INTERIM_ALLOWED_LIST_URL);
     let trust_config = fetch(INTERIM_TRUST_CONFIG_URL);
-    if let Err(e) = apply_trust_settings(
+    match build_trust_settings(
         &trust_anchors,
         allowed_list.as_deref().map(|s| s.trim()),
         trust_config.as_deref().map(|s| s.trim()),
     ) {
-        eprintln!("Trust lists: failed to apply settings: {}", e);
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Trust lists: failed to build settings: {}", e);
+            default_extraction_settings()
+        }
     }
 }
 

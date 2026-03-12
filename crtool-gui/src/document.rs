@@ -18,7 +18,8 @@ use crate::manifest_ui::{
 };
 use crate::util;
 use crtool::{
-    extract_crjson_manifest, validate_json_value, ManifestExtractionResult, ValidationResult,
+    extract_crjson_manifest_with_settings, validate_json_value, ManifestExtractionResult, Settings,
+    ValidationResult,
 };
 use eframe::egui;
 use egui_code_editor::{CodeEditor, ColorTheme};
@@ -50,8 +51,16 @@ pub(crate) struct DocumentTab {
 }
 
 /// Load one document from disk and return a DocumentTab. Uses security-scoped access on macOS when needed.
-pub(crate) fn load_document(file_path: PathBuf, schema_path: &Path) -> DocumentTab {
-    let extract = || extract_crjson_manifest(&file_path).map_err(|e| e.to_string());
+/// Uses the given Settings for extraction so trust validation is applied consistently (no thread-local reliance).
+pub(crate) fn load_document(
+    file_path: PathBuf,
+    schema_path: &Path,
+    extraction_settings: &Settings,
+) -> DocumentTab {
+    let extract = || {
+        extract_crjson_manifest_with_settings(&file_path, extraction_settings)
+            .map_err(|e| e.to_string())
+    };
     let result = {
         #[cfg(target_os = "macos")]
         {
@@ -215,7 +224,8 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
     ui.separator();
 
     if let Some(ref validation) = tab.validation_result {
-        let manifest_failures = get_validation_failures(&manifest.manifest_value);
+        let manifest_failures =
+            get_validation_failures(&manifest.manifest_value, &manifest.active_label);
         let has_schema_errors = !validation.errors.is_empty();
         let has_manifest_failures = !manifest_failures.is_empty();
 

@@ -142,11 +142,20 @@ pub(crate) fn get_timestamp_info(
     (true, name)
 }
 
-/// Extract trust status from the active manifest (identified by label).
+/// Extract trust status: document-level `validationInfo.trust` (new schema) or
+/// active manifest `status.trust` (legacy).
 pub(crate) fn get_trust_status(
     manifest_value: &serde_json::Value,
     active_label: &str,
 ) -> Option<String> {
+    // New schema: document-level validationInfo.trust
+    if let Some(s) = manifest_value
+        .get("validationInfo")
+        .and_then(|v| v.get("trust"))
+        .and_then(|v| v.as_str())
+    {
+        return Some(s.to_string());
+    }
     let active_manifest = manifest_value
         .get("manifests")
         .and_then(|v| v.as_array())
@@ -164,9 +173,9 @@ pub(crate) fn get_trust_status(
             }
         })?;
     active_manifest
-        .get("status")?
-        .get("trust")?
-        .as_str()
+        .get("status")
+        .and_then(|s| s.get("trust"))
+        .and_then(|t| t.as_str())
         .map(|s| s.to_string())
 }
 
@@ -180,22 +189,18 @@ pub(crate) struct ValidationFailureEntry {
     pub(crate) source: Option<String>,
 }
 
-/// Collect all validation failure entries from validationResults (activeManifest.failure and
-/// ingredientDeltas[].validationDeltas.failure), excluding signingCredential.untrusted (shown
-/// elsewhere as trust status).
+/// Collect all validation failure entries for the active manifest. Uses new schema locations:
+/// active manifest's `validationResults.failure` (statusCodes) and
+/// `ingredientDeltas[].validationDeltas.failure`. Falls back to document-level
+/// `validationResults.activeManifest.failure` and `validationResults.ingredientDeltas` for
+/// legacy crJSON. Excludes signingCredential.untrusted (shown as trust status).
 pub(crate) fn get_validation_failures(
     manifest_value: &serde_json::Value,
+    active_label: &str,
 ) -> Vec<ValidationFailureEntry> {
     const UNTRUSTED_CODE: &str = "signingCredential.untrusted";
 
     let mut out = Vec::new();
-    let vr = match manifest_value
-        .get("validationResults")
-        .and_then(|v| v.as_object())
-    {
-        Some(o) => o,
-        None => return out,
-    };
 
     let push_entries = |out: &mut Vec<ValidationFailureEntry>,
                         arr: Option<&serde_json::Value>,
@@ -228,19 +233,53 @@ pub(crate) fn get_validation_failures(
         }
     };
 
-    if let Some(am) = vr.get("activeManifest").and_then(|v| v.as_object()) {
-        push_entries(&mut out, am.get("failure"), None);
+    // New schema: per-manifest validationResults (statusCodes) and ingredientDeltas
+    let active_manifest = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        });
+
+    if let Some(am) = active_manifest {
+        if let Some(vr) = am.get("validationResults").and_then(|v| v.as_object()) {
+            push_entries(&mut out, vr.get("failure"), None);
+        }
+        if let Some(deltas) = am.get("ingredientDeltas").and_then(|v| v.as_array()) {
+            for delta in deltas {
+                let uri = delta
+                    .get("ingredientAssertionURI")
+                    .and_then(|v| v.as_str())
+                    .map(|s| format!("Ingredient: {}", s));
+                let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
+                if let Some(vd) = vd {
+                    push_entries(&mut out, vd.get("failure"), uri);
+                }
+            }
+        }
     }
 
-    if let Some(deltas) = vr.get("ingredientDeltas").and_then(|v| v.as_array()) {
-        for delta in deltas {
-            let uri = delta
-                .get("ingredientAssertionURI")
-                .and_then(|v| v.as_str())
-                .map(|s| format!("Ingredient: {}", s));
-            let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
-            if let Some(vd) = vd {
-                push_entries(&mut out, vd.get("failure"), uri);
+    // Fallback: legacy document-level validationResults (activeManifest + ingredientDeltas)
+    if out.is_empty() {
+        let vr = manifest_value
+            .get("validationResults")
+            .and_then(|v| v.as_object());
+        if let Some(vr) = vr {
+            if let Some(am) = vr.get("activeManifest").and_then(|v| v.as_object()) {
+                push_entries(&mut out, am.get("failure"), None);
+            }
+            if let Some(deltas) = vr.get("ingredientDeltas").and_then(|v| v.as_array()) {
+                for delta in deltas {
+                    let uri = delta
+                        .get("ingredientAssertionURI")
+                        .and_then(|v| v.as_str())
+                        .map(|s| format!("Ingredient: {}", s));
+                    let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
+                    if let Some(vd) = vd {
+                        push_entries(&mut out, vd.get("failure"), uri);
+                    }
+                }
             }
         }
     }

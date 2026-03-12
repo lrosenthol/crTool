@@ -11,13 +11,13 @@ governing permissions and limitations under the License.
 */
 
 use anyhow::{Context, Result};
-use c2pa::{
-    create_signer, Builder, CallbackSigner, CrJsonReader, Ingredient, Relationship, SigningAlg,
-};
+use c2pa::Settings;
+use c2pa::{create_signer, Builder, CallbackSigner, Ingredient, Relationship, SigningAlg};
 use clap::Parser;
 use crtool::{
-    apply_trust_settings, C2PA_TRUST_ANCHORS_URL, INTERIM_ALLOWED_LIST_URL,
-    INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL, SUPPORTED_ASSET_EXTENSIONS,
+    build_trust_settings, extract_crjson_manifest_with_settings, C2PA_TRUST_ANCHORS_URL,
+    INTERIM_ALLOWED_LIST_URL, INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
+    SUPPORTED_ASSET_EXTENSIONS,
 };
 use glob::glob;
 use serde_json::Value as JsonValue;
@@ -115,30 +115,33 @@ fn fetch_url(url: &str) -> Result<String> {
     Ok(body)
 }
 
-/// Load the official C2PA trust list and the Content Credentials interim trust list from their
-/// canonical URLs, merge trust anchors, and apply thread-local Settings for validation.
-fn load_trust_lists_and_apply() -> Result<()> {
-    println!("Loading C2PA and Content Credentials trust lists...");
-    let c2pa_anchors =
-        fetch_url(C2PA_TRUST_ANCHORS_URL).context("Failed to fetch official C2PA trust list")?;
-    let interim_anchors =
-        fetch_url(INTERIM_TRUST_ANCHORS_URL).context("Failed to fetch interim trust anchors")?;
-    let trust_anchors = format!(
-        "{}\n{}",
-        c2pa_anchors.trim_end(),
-        interim_anchors.trim_end()
-    );
-    let allowed_list =
-        fetch_url(INTERIM_ALLOWED_LIST_URL).context("Failed to fetch interim allowed list")?;
-    let trust_config =
-        fetch_url(INTERIM_TRUST_CONFIG_URL).context("Failed to fetch interim trust config")?;
-    apply_trust_settings(
-        &trust_anchors,
-        Some(allowed_list.trim()),
-        Some(trust_config.trim()),
-    )?;
-    println!("  Trust list validation enabled");
-    Ok(())
+/// Build Settings for extraction: with trust lists when `with_trust` is true, otherwise
+/// verify_trust disabled so certificates are not reported as untrusted.
+fn extraction_settings(with_trust: bool) -> Result<Settings> {
+    if with_trust {
+        println!("Loading C2PA and Content Credentials trust lists...");
+        let c2pa_anchors = fetch_url(C2PA_TRUST_ANCHORS_URL)
+            .context("Failed to fetch official C2PA trust list")?;
+        let interim_anchors = fetch_url(INTERIM_TRUST_ANCHORS_URL)
+            .context("Failed to fetch interim trust anchors")?;
+        let trust_anchors = format!(
+            "{}\n{}",
+            c2pa_anchors.trim_end(),
+            interim_anchors.trim_end()
+        );
+        let allowed_list =
+            fetch_url(INTERIM_ALLOWED_LIST_URL).context("Failed to fetch interim allowed list")?;
+        let trust_config =
+            fetch_url(INTERIM_TRUST_CONFIG_URL).context("Failed to fetch interim trust config")?;
+        println!("  Trust list validation enabled");
+        build_trust_settings(
+            &trust_anchors,
+            Some(allowed_list.trim()),
+            Some(trust_config.trim()),
+        )
+    } else {
+        Ok(crtool::default_extraction_settings())
+    }
 }
 
 /// Expand glob patterns and collect matching file paths
@@ -542,7 +545,7 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 }
 
 /// Extract C2PA manifest from a file and save it as crJSON
-fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
+fn extract_manifest(input_path: &Path, output_path: &Path, settings: &Settings) -> Result<()> {
     if !input_path.exists() {
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
@@ -550,21 +553,14 @@ fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
     println!("Extracting C2PA manifest (crJSON)...");
     println!("  Input: {:?}", input_path);
 
-    let crjson_reader = CrJsonReader::from_file(input_path).context(
+    let extract_result = extract_crjson_manifest_with_settings(input_path, settings).context(
         "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
     )?;
 
-    let active_label = crjson_reader
-        .inner()
-        .active_label()
-        .context("No active C2PA manifest found in the input file")?;
-
+    let active_label = &extract_result.active_label;
     println!("  Active manifest label: {}", active_label);
 
-    let json_str = crjson_reader.json();
-    let mut json_value: JsonValue =
-        serde_json::from_str(&json_str).context("Failed to parse crJSON")?;
-    crtool::normalize_crjson_validation_results(&mut json_value);
+    let mut json_value: JsonValue = extract_result.manifest_value;
     // Ensure @context is present for valid crJSON (SDK may omit it)
     if !json_value.get("@context").is_some() {
         if let Some(obj) = json_value.as_object_mut() {
@@ -820,9 +816,8 @@ fn validate_json_files(
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    if cli.trust {
-        load_trust_lists_and_apply().context("Failed to load trust lists")?;
-    }
+    let extraction_settings =
+        extraction_settings(cli.trust).context("Failed to prepare extraction settings")?;
 
     // Expand glob patterns and collect all input files
     let input_files =
@@ -879,7 +874,7 @@ fn main() -> Result<()> {
         let mut error_count = 0;
 
         for input_file in &input_files {
-            match extract_manifest(input_file, &output) {
+            match extract_manifest(input_file, &output, &extraction_settings) {
                 Ok(_) => success_count += 1,
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);

@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 #![allow(dead_code)]
 
 use anyhow::Result;
-use c2pa::{Builder, CallbackSigner, CrJsonReader, Ingredient, Reader, Relationship, SigningAlg};
+use c2pa::{Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
 use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
@@ -534,13 +534,13 @@ pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result
     extract_manifest_impl(input_path, output_path)
 }
 
-/// Helper function to extract manifest from a signed file in crJSON format (CrJsonReader).
+/// Helper function to extract manifest from a signed file in crJSON format (Reader::crjson).
 pub fn extract_manifest_to_file_crjson(input_path: &Path, output_path: &Path) -> Result<()> {
     if output_path.exists() {
         fs::remove_file(output_path)?;
     }
-    let crjson_reader = CrJsonReader::from_file(input_path)?;
-    let manifest_json = crjson_reader.json();
+    let reader = Reader::from_file(input_path)?;
+    let manifest_json = reader.crjson();
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
