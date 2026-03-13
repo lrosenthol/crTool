@@ -115,6 +115,57 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Profile Eval: real-life-capture",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=crTool",
+                    "--package=crTool"
+                ],
+                "filter": {
+                    "name": "crTool",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--profile",
+                "profiles/real-life-capture_profile.yml",
+                "--report-format",
+                "json",
+                "tests/fixtures/real_life_capture_indicators.json"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Extract + Profile Eval: real-life-capture",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=crTool",
+                    "--package=crTool"
+                ],
+                "filter": {
+                    "name": "crTool",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--extract",
+                "--profile",
+                "profiles/real-life-capture_profile.yml",
+                "--report-format",
+                "json",
+                "tests/fixtures/assets/PXL_20260208_202351558.jpg",
+                "-o",
+                "target/output/PXL_20260208_202351558_output.json"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Validate crJSON",
             "cargo": {
                 "args": [
