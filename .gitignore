@@ -33,3 +33,8 @@ crTool.app/
 /INTERNAL/cddl/*
 testset/~$C2PA-JPT Testfiles.xlsx
 crTool.app.zip
+
+# Adobe security rules
+.cursor/rules/manifest.json
+.cursor/rules/security-global/*
+.cursor/rules/security-lang/*
