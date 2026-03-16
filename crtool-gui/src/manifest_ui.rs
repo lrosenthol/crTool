@@ -142,20 +142,34 @@ pub(crate) fn get_timestamp_info(
     (true, name)
 }
 
-/// Extract trust status: document-level `validationInfo.trust` (new schema) or
-/// active manifest `status.trust` (legacy).
+/// Derive trust status from a manifest's `validationResults` (success/failure arrays).
+/// New schema: each manifest has its own validationResults; trust is inferred from status codes.
+fn trust_from_validation_results(vr: &serde_json::Value) -> Option<String> {
+    let vr = vr.as_object()?;
+    let has_code = |key: &str, code: &str| -> bool {
+        vr.get(key)
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .any(|e| e.get("code").and_then(|c| c.as_str()) == Some(code))
+            })
+            .unwrap_or(false)
+    };
+    if has_code("failure", "signingCredential.untrusted") {
+        return Some("signingCredential.untrusted".to_string());
+    }
+    if has_code("success", "signingCredential.trusted") {
+        return Some("signingCredential.trusted".to_string());
+    }
+    None
+}
+
+/// Extract trust status from the active manifest (manifests[] entry matching active_label).
+/// Uses that manifest's validationResults (success/failure codes); falls back to status.trust for legacy crJSON.
 pub(crate) fn get_trust_status(
     manifest_value: &serde_json::Value,
     active_label: &str,
 ) -> Option<String> {
-    // New schema: document-level validationInfo.trust
-    if let Some(s) = manifest_value
-        .get("validationInfo")
-        .and_then(|v| v.get("trust"))
-        .and_then(|v| v.as_str())
-    {
-        return Some(s.to_string());
-    }
     let active_manifest = manifest_value
         .get("manifests")
         .and_then(|v| v.as_array())
@@ -173,10 +187,15 @@ pub(crate) fn get_trust_status(
             }
         })?;
     active_manifest
-        .get("status")
-        .and_then(|s| s.get("trust"))
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string())
+        .get("validationResults")
+        .and_then(trust_from_validation_results)
+        .or_else(|| {
+            active_manifest
+                .get("status")
+                .and_then(|s| s.get("trust"))
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
 }
 
 /// One validation failure entry from validationResults (code + optional url/explanation).
@@ -189,11 +208,10 @@ pub(crate) struct ValidationFailureEntry {
     pub(crate) source: Option<String>,
 }
 
-/// Collect all validation failure entries for the active manifest. Uses new schema locations:
-/// active manifest's `validationResults.failure` (statusCodes) and
-/// `ingredientDeltas[].validationDeltas.failure`. Falls back to document-level
-/// `validationResults.activeManifest.failure` and `validationResults.ingredientDeltas` for
-/// legacy crJSON. Excludes signingCredential.untrusted (shown as trust status).
+/// Collect validation failure entries for the active manifest. Uses the manifest record's
+/// `validationResults.failure` and `ingredientDeltas[].validationDeltas.failure`. Falls back to
+/// document-level `validationResults.activeManifest` / `ingredientDeltas` for legacy crJSON.
+/// Excludes signingCredential.untrusted (shown as trust status).
 pub(crate) fn get_validation_failures(
     manifest_value: &serde_json::Value,
     active_label: &str,
@@ -284,6 +302,68 @@ pub(crate) fn get_validation_failures(
         }
     }
 
+    out
+}
+
+/// Collect validation failure entries from a single manifest record (its validationResults and
+/// ingredientDeltas). Used for ingredient tree nodes so each ingredient shows the matching
+/// manifest's validation. Excludes signingCredential.untrusted.
+pub(crate) fn get_validation_failures_for_manifest(
+    manifest_obj: &serde_json::Value,
+) -> Vec<ValidationFailureEntry> {
+    const UNTRUSTED_CODE: &str = "signingCredential.untrusted";
+    let mut out = Vec::new();
+    let push_entries = |out: &mut Vec<ValidationFailureEntry>,
+                        arr: Option<&serde_json::Value>,
+                        source: Option<String>| {
+        let arr = match arr.and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+        for entry in arr {
+            let obj = match entry.as_object() {
+                Some(o) => o,
+                None => continue,
+            };
+            let code = match obj.get("code").and_then(|v| v.as_str()) {
+                Some(c) => c,
+                None => continue,
+            };
+            if code == UNTRUSTED_CODE {
+                continue;
+            }
+            out.push(ValidationFailureEntry {
+                code: code.to_string(),
+                explanation: obj
+                    .get("explanation")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                url: obj.get("url").and_then(|v| v.as_str()).map(String::from),
+                source: source.clone(),
+            });
+        }
+    };
+    if let Some(vr) = manifest_obj
+        .get("validationResults")
+        .and_then(|v| v.as_object())
+    {
+        push_entries(&mut out, vr.get("failure"), None);
+    }
+    if let Some(deltas) = manifest_obj
+        .get("ingredientDeltas")
+        .and_then(|v| v.as_array())
+    {
+        for delta in deltas {
+            let uri = delta
+                .get("ingredientAssertionURI")
+                .and_then(|v| v.as_str())
+                .map(|s| format!("Ingredient: {}", s));
+            let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
+            if let Some(vd) = vd {
+                push_entries(&mut out, vd.get("failure"), uri);
+            }
+        }
+    }
     out
 }
 
@@ -642,12 +722,19 @@ fn format_one_cgi_entry(entry: &serde_json::Value) -> String {
     }
 }
 
+/// Trust status for a manifest (used for both root and ingredient tree nodes).
+/// Uses the manifest's validationResults (success/failure); falls back to status.trust for legacy.
 fn trust_status_from_manifest(manifest_obj: &serde_json::Value) -> Option<String> {
     manifest_obj
-        .get("status")
-        .and_then(|s| s.get("trust"))
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string())
+        .get("validationResults")
+        .and_then(trust_from_validation_results)
+        .or_else(|| {
+            manifest_obj
+                .get("status")
+                .and_then(|s| s.get("trust"))
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
 }
 
 fn ingredient_display_name(ing: &serde_json::Value) -> String {
@@ -834,6 +921,34 @@ fn ingredient_node_details(
                     .size(small)
                     .color(gray),
             );
+        }
+        let failures = get_validation_failures_for_manifest(nested);
+        if !failures.is_empty() {
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new("Validation failures (this manifest):")
+                    .size(small)
+                    .color(egui::Color32::from_rgb(255, 150, 150)),
+            );
+            for entry in &failures {
+                let line = if let Some(ref src) = entry.source {
+                    format!("  {} — {}", src, entry.code)
+                } else {
+                    format!("  {}", entry.code)
+                };
+                ui.label(
+                    egui::RichText::new(line)
+                        .size(small)
+                        .color(egui::Color32::from_rgb(255, 120, 120)),
+                );
+                if let Some(ref ex) = entry.explanation {
+                    ui.label(
+                        egui::RichText::new(format!("    {}", ex))
+                            .size(small - 1.0)
+                            .color(gray),
+                    );
+                }
+            }
         }
     }
 }
