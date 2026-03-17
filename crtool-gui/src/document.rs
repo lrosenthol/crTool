@@ -13,8 +13,9 @@ governing permissions and limitations under the License.
 //! Document tab state and UI: one loaded file per tab (manifest, validation, tree, raw JSON).
 
 use crate::manifest_ui::{
-    display_manifest_ingredient_tree, get_generator_name, get_signature_issued_info,
-    get_timestamp_info, get_trust_status, get_validation_failures, ValidationFailureEntry,
+    display_manifest_ingredient_tree, get_claim_type, get_generator_name,
+    get_signature_issued_info, get_timestamp_info, get_trust_status, get_validation_failures,
+    ValidationFailureEntry,
 };
 use crate::util;
 use crtool::{
@@ -168,6 +169,17 @@ pub(crate) fn show_document_tab_ui(ui: &mut egui::Ui, tab: &mut DocumentTab) {
         )
         .show(ui);
     });
+
+    if let Some(claim_type) = get_claim_type(&manifest.manifest_value, &manifest.active_label) {
+        ui.horizontal(|ui| {
+            EmojiLabel::new(
+                egui::RichText::new(format!("📋 Claim type: {}", claim_type))
+                    .size(15.0)
+                    .color(egui::Color32::from_rgb(100, 120, 140)),
+            )
+            .show(ui);
+        });
+    }
 
     let (timestamp_present, tsa_authority) =
         get_timestamp_info(&manifest.manifest_value, &manifest.active_label);
