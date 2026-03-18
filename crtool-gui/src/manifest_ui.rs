@@ -110,15 +110,28 @@ pub(crate) fn get_timestamp_info(
     manifest_value: &serde_json::Value,
     active_label: &str,
 ) -> (bool, Option<String>) {
-    let sig = manifest_value
+    let manifest_obj = manifest_value
         .get("manifests")
         .and_then(|v| v.as_array())
         .and_then(|arr| {
             arr.iter()
                 .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
         })
-        .and_then(|m| m.get("signature"))
-        .and_then(|s| s.as_object());
+        .or_else(|| {
+            if manifest_value.get("claim_generator_info").is_some()
+                || manifest_value.get("title").is_some()
+            {
+                Some(manifest_value)
+            } else {
+                None
+            }
+        });
+    manifest_obj.map_or((false, None), |m| timestamp_from_manifest(m))
+}
+
+/// Get timestamp presence and TSA authority from a single manifest object (e.g. for ingredient manifests).
+fn timestamp_from_manifest(manifest_obj: &serde_json::Value) -> (bool, Option<String>) {
+    let sig = manifest_obj.get("signature").and_then(|s| s.as_object());
     let Some(sig) = sig else {
         return (false, None);
     };
@@ -142,20 +155,59 @@ pub(crate) fn get_timestamp_info(
     (true, name)
 }
 
-/// Extract trust status: document-level `validationInfo.trust` (new schema) or
-/// active manifest `status.trust` (legacy).
+/// Get claim type for the active manifest (e.g. "claim.v2" or "claim") for display in the top bar.
+pub(crate) fn get_claim_type(
+    manifest_value: &serde_json::Value,
+    active_label: &str,
+) -> Option<String> {
+    let active_manifest = manifest_value
+        .get("manifests")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("label").and_then(|v| v.as_str()) == Some(active_label))
+        })
+        .or_else(|| {
+            if manifest_value.get("claim_generator_info").is_some()
+                || manifest_value.get("title").is_some()
+            {
+                Some(manifest_value)
+            } else {
+                None
+            }
+        })?;
+    let (claim_type, _, _) = manifest_claim_info(active_manifest);
+    claim_type.map(|s| s.to_string())
+}
+
+/// Derive trust status from a manifest's `validationResults` (success/failure arrays).
+/// New schema: each manifest has its own validationResults; trust is inferred from status codes.
+fn trust_from_validation_results(vr: &serde_json::Value) -> Option<String> {
+    let vr = vr.as_object()?;
+    let has_code = |key: &str, code: &str| -> bool {
+        vr.get(key)
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .any(|e| e.get("code").and_then(|c| c.as_str()) == Some(code))
+            })
+            .unwrap_or(false)
+    };
+    if has_code("failure", "signingCredential.untrusted") {
+        return Some("signingCredential.untrusted".to_string());
+    }
+    if has_code("success", "signingCredential.trusted") {
+        return Some("signingCredential.trusted".to_string());
+    }
+    None
+}
+
+/// Extract trust status from the active manifest (manifests[] entry matching active_label).
+/// Uses that manifest's validationResults (success/failure codes); falls back to status.trust for legacy crJSON.
 pub(crate) fn get_trust_status(
     manifest_value: &serde_json::Value,
     active_label: &str,
 ) -> Option<String> {
-    // New schema: document-level validationInfo.trust
-    if let Some(s) = manifest_value
-        .get("validationInfo")
-        .and_then(|v| v.get("trust"))
-        .and_then(|v| v.as_str())
-    {
-        return Some(s.to_string());
-    }
     let active_manifest = manifest_value
         .get("manifests")
         .and_then(|v| v.as_array())
@@ -173,10 +225,15 @@ pub(crate) fn get_trust_status(
             }
         })?;
     active_manifest
-        .get("status")
-        .and_then(|s| s.get("trust"))
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string())
+        .get("validationResults")
+        .and_then(trust_from_validation_results)
+        .or_else(|| {
+            active_manifest
+                .get("status")
+                .and_then(|s| s.get("trust"))
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
 }
 
 /// One validation failure entry from validationResults (code + optional url/explanation).
@@ -189,11 +246,10 @@ pub(crate) struct ValidationFailureEntry {
     pub(crate) source: Option<String>,
 }
 
-/// Collect all validation failure entries for the active manifest. Uses new schema locations:
-/// active manifest's `validationResults.failure` (statusCodes) and
-/// `ingredientDeltas[].validationDeltas.failure`. Falls back to document-level
-/// `validationResults.activeManifest.failure` and `validationResults.ingredientDeltas` for
-/// legacy crJSON. Excludes signingCredential.untrusted (shown as trust status).
+/// Collect validation failure entries for the active manifest. Uses the manifest record's
+/// `validationResults.failure` and `ingredientDeltas[].validationDeltas.failure`. Falls back to
+/// document-level `validationResults.activeManifest` / `ingredientDeltas` for legacy crJSON.
+/// Excludes signingCredential.untrusted (shown as trust status).
 pub(crate) fn get_validation_failures(
     manifest_value: &serde_json::Value,
     active_label: &str,
@@ -287,6 +343,68 @@ pub(crate) fn get_validation_failures(
     out
 }
 
+/// Collect validation failure entries from a single manifest record (its validationResults and
+/// ingredientDeltas). Used for ingredient tree nodes so each ingredient shows the matching
+/// manifest's validation. Excludes signingCredential.untrusted.
+pub(crate) fn get_validation_failures_for_manifest(
+    manifest_obj: &serde_json::Value,
+) -> Vec<ValidationFailureEntry> {
+    const UNTRUSTED_CODE: &str = "signingCredential.untrusted";
+    let mut out = Vec::new();
+    let push_entries = |out: &mut Vec<ValidationFailureEntry>,
+                        arr: Option<&serde_json::Value>,
+                        source: Option<String>| {
+        let arr = match arr.and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+        for entry in arr {
+            let obj = match entry.as_object() {
+                Some(o) => o,
+                None => continue,
+            };
+            let code = match obj.get("code").and_then(|v| v.as_str()) {
+                Some(c) => c,
+                None => continue,
+            };
+            if code == UNTRUSTED_CODE {
+                continue;
+            }
+            out.push(ValidationFailureEntry {
+                code: code.to_string(),
+                explanation: obj
+                    .get("explanation")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                url: obj.get("url").and_then(|v| v.as_str()).map(String::from),
+                source: source.clone(),
+            });
+        }
+    };
+    if let Some(vr) = manifest_obj
+        .get("validationResults")
+        .and_then(|v| v.as_object())
+    {
+        push_entries(&mut out, vr.get("failure"), None);
+    }
+    if let Some(deltas) = manifest_obj
+        .get("ingredientDeltas")
+        .and_then(|v| v.as_array())
+    {
+        for delta in deltas {
+            let uri = delta
+                .get("ingredientAssertionURI")
+                .and_then(|v| v.as_str())
+                .map(|s| format!("Ingredient: {}", s));
+            let vd = delta.get("validationDeltas").and_then(|v| v.as_object());
+            if let Some(vd) = vd {
+                push_entries(&mut out, vd.get("failure"), uri);
+            }
+        }
+    }
+    out
+}
+
 /// Recursively display manifest → ingredients tree in the given UI.
 pub(crate) fn display_manifest_ingredient_tree(
     ui: &mut egui::Ui,
@@ -350,27 +468,15 @@ pub(crate) fn display_manifest_ingredient_tree(
                     .color(egui::Color32::from_rgb(64, 64, 64)),
             );
         }
-        if let Some(ref gen) = claim_gen {
-            ui.label(
-                egui::RichText::new(format!("Claim generator: {}", gen))
-                    .size(12.0)
-                    .color(egui::Color32::from_rgb(64, 64, 64)),
-            );
-        }
-        if let Some(ref info) = claim_gen_info {
-            ui.label(
-                egui::RichText::new(format!("Claim generator info: {}", info))
-                    .size(12.0)
-                    .color(egui::Color32::from_rgb(64, 64, 64)),
-            );
-        }
-        if let Some(label) = active_manifest.get("label").and_then(|v| v.as_str()) {
-            ui.label(
-                egui::RichText::new(format!("Label: {}", label))
-                    .size(12.0)
-                    .color(egui::Color32::from_rgb(64, 64, 64)),
-            );
-        }
+        let app_or_device = claim_gen_info
+            .as_deref()
+            .or(claim_gen.as_deref())
+            .unwrap_or("—");
+        ui.label(
+            egui::RichText::new(format!("App or device used: {}", app_or_device))
+                .size(12.0)
+                .color(egui::Color32::from_rgb(64, 64, 64)),
+        );
         let ingredients = collect_ingredients_from_manifest(active_manifest);
         if let Some(dst) = manifest_digital_source_type(active_manifest) {
             ui.label(
@@ -421,51 +527,45 @@ pub(crate) fn display_manifest_ingredient_tree(
 
 // --- Private helpers ---
 
+/// Ingredient assertion labels in crJSON: c2pa.ingredient (v1), c2pa.ingredient.v2, c2pa.ingredient.v3,
+/// and any instance suffix (e.g. c2pa.ingredient.v3__2). Thumbnail keys like c2pa.thumbnail.ingredient.*
+/// are not ingredient assertions for the tree.
+fn is_ingredient_assertion_label(key: &str) -> bool {
+    key == "c2pa.ingredient" || key.starts_with("c2pa.ingredient.")
+}
+
+/// Collect ingredients from a manifest by scanning its assertions. Each assertion whose label
+/// is an ingredient assertion (c2pa.ingredient, c2pa.ingredient.v2, c2pa.ingredient.v3) is used;
+/// the assertion value is the ingredient payload. If that payload has activeManifest (or
+/// active_manifest), the nested manifest is resolved from the document's manifests list in
+/// nested_manifest_for_ingredient.
 fn collect_ingredients_from_manifest(manifest_obj: &serde_json::Value) -> Vec<&serde_json::Value> {
     let mut out = Vec::new();
-    let obj = match manifest_obj.as_object() {
-        Some(o) => o,
+    let assertions = match manifest_obj.get("assertions").and_then(|v| v.as_object()) {
+        Some(a) => a,
         None => return out,
     };
-    for key in ["claim.v2", "claim"] {
-        if let Some(claim) = obj.get(key) {
-            if let Some(arr) = claim.get("ingredients").and_then(|v| v.as_array()) {
-                for ing in arr {
-                    out.push(ing);
-                }
-            }
+    for (key, val) in assertions {
+        if !is_ingredient_assertion_label(key) {
+            continue;
         }
-    }
-    if let Some(arr) = obj.get("ingredients").and_then(|v| v.as_array()) {
-        for ing in arr {
-            out.push(ing);
+        // Skip thumbnail ingredient assertions (e.g. c2pa.thumbnail.ingredient.jpeg).
+        if key.contains("thumbnail") {
+            continue;
         }
-    }
-    if let Some(assertions) = obj.get("assertions").and_then(|v| v.as_object()) {
-        for (key, val) in assertions {
-            if !key.contains("ingredient") {
-                continue;
-            }
-            if let Some(data) = val.get("data") {
-                if let Some(arr) = data.as_array() {
-                    for ing in arr {
-                        out.push(ing);
-                    }
-                } else if data.get("relationship").is_some()
-                    || data.get("title").is_some()
-                    || data.get("instanceID").is_some()
-                {
-                    out.push(data);
-                }
-            } else if val.get("relationship").is_some()
-                || val.get("title").is_some()
-                || val.get("instanceID").is_some()
-            {
-                out.push(val);
-            }
-        }
+        out.push(val);
     }
     out
+}
+
+/// Extract manifest label (URN) from a JUMBF or manifest URI string, e.g.
+/// "self#jumbf=/c2pa/urn:c2pa:b3f78b96-8474-5d7c-f248-4f76c1945b43/..." -> "urn:c2pa:b3f78b96-8474-5d7c-f248-4f76c1945b43".
+fn manifest_label_from_uri(uri: &str) -> Option<&str> {
+    let needle = "urn:c2pa:";
+    let start = uri.find(needle)?;
+    let rest = &uri[start..];
+    let end = rest.find('/').unwrap_or(rest.len());
+    Some(rest.get(..end).unwrap_or(rest))
 }
 
 fn find_manifest_by_label<'a>(
@@ -483,29 +583,36 @@ fn find_manifest_by_label<'a>(
     })
 }
 
+/// Resolve the nested manifest for an ingredient. The ingredient assertion may have
+/// active_manifest (string) or activeManifest (string or object with "url"/"uri").
+/// We match that to an entry in the document's manifests list.
 fn nested_manifest_for_ingredient<'a>(
     manifest_value: &'a serde_json::Value,
     ingredient: &serde_json::Value,
 ) -> Option<&'a serde_json::Value> {
     let mut labels_to_try: Vec<&str> = Vec::new();
+
+    // String: active_manifest (snake_case) or activeManifest (camelCase)
     if let Some(s) = ingredient.get("active_manifest").and_then(|v| v.as_str()) {
         labels_to_try.push(s);
     }
     if let Some(s) = ingredient.get("activeManifest").and_then(|v| v.as_str()) {
         labels_to_try.push(s);
     }
-    if let Some(s) = ingredient
-        .get("activeManifest")
-        .and_then(|o| o.get("uri"))
-        .and_then(|v| v.as_str())
-    {
-        labels_to_try.push(s);
-    }
-    for key in ["instanceID", "instance_id", "documentID", "label"] {
-        if let Some(s) = ingredient.get(key).and_then(|v| v.as_str()) {
-            labels_to_try.push(s);
+
+    // Object: activeManifest as hashed-uri with "url" or "uri" (c2pa-rs emits "url")
+    if let Some(am) = ingredient.get("activeManifest").and_then(|v| v.as_object()) {
+        for key in ["url", "uri"] {
+            if let Some(s) = am.get(key).and_then(|v| v.as_str()) {
+                if let Some(label) = manifest_label_from_uri(s) {
+                    labels_to_try.push(label);
+                } else {
+                    labels_to_try.push(s);
+                }
+            }
         }
     }
+
     for label in labels_to_try {
         if let Some(m) = find_manifest_by_label(manifest_value, label) {
             return Some(m);
@@ -642,12 +749,34 @@ fn format_one_cgi_entry(entry: &serde_json::Value) -> String {
     }
 }
 
+/// Trust status for a manifest (used for both root and ingredient tree nodes).
+/// Uses the manifest's validationResults (success/failure); falls back to status.trust for legacy.
+/// Also checks validation_results (snake_case) for crJSON that uses that key.
 fn trust_status_from_manifest(manifest_obj: &serde_json::Value) -> Option<String> {
     manifest_obj
-        .get("status")
-        .and_then(|s| s.get("trust"))
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string())
+        .get("validationResults")
+        .or_else(|| manifest_obj.get("validation_results"))
+        .and_then(trust_from_validation_results)
+        .or_else(|| {
+            manifest_obj
+                .get("status")
+                .and_then(|s| s.get("trust"))
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
+}
+
+/// Trust status for an ingredient's active manifest from the ingredient assertion payload.
+/// Ingredient v3 (and similar) can have validation_results.activeManifest or
+/// validationResults.activeManifest with success/failure arrays for the linked manifest.
+fn trust_status_from_ingredient(ingredient: &serde_json::Value) -> Option<String> {
+    let vr = ingredient
+        .get("validation_results")
+        .or_else(|| ingredient.get("validationResults"))?;
+    let active = vr
+        .get("activeManifest")
+        .or_else(|| vr.get("active_manifest"))?;
+    trust_from_validation_results(active)
 }
 
 fn ingredient_display_name(ing: &serde_json::Value) -> String {
@@ -663,7 +792,14 @@ fn ingredient_display_name(ing: &serde_json::Value) -> String {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string())
         })
-        .unwrap_or_else(|| "(unnamed)".to_string())
+        .unwrap_or_else(|| {
+            // Name only (relationship is shown in []; don't duplicate).
+            ing.get("format")
+                .or_else(|| ing.get("dc:format"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "(no title)".to_string())
+        })
 }
 
 fn render_ingredient_node(
@@ -739,7 +875,11 @@ fn ingredient_node_details(
                 .color(gray),
         );
     }
-    if let Some(s) = ingredient.get("format").and_then(|v| v.as_str()) {
+    if let Some(s) = ingredient
+        .get("format")
+        .or_else(|| ingredient.get("dc:format"))
+        .and_then(|v| v.as_str())
+    {
         ui.label(
             egui::RichText::new(format!("Format: {}", s))
                 .size(small)
@@ -759,34 +899,15 @@ fn ingredient_node_details(
                 .color(gray),
         );
     }
-    if let Some(label) = ingredient
-        .get("active_manifest")
-        .and_then(|v| v.as_str())
-        .or_else(|| ingredient.get("activeManifest").and_then(|v| v.as_str()))
-    {
-        ui.label(
-            egui::RichText::new(format!("Active manifest: {}", label))
-                .size(small)
-                .color(gray),
-        );
-    } else if ingredient
-        .get("activeManifest")
-        .and_then(|v| v.as_object())
-        .is_some()
-    {
-        if let Some(uri) = ingredient
-            .get("activeManifest")
-            .and_then(|o| o.get("uri"))
-            .and_then(|v| v.as_str())
-        {
+    if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ingredient) {
+        // Show the ingredient manifest's ID (URN) first.
+        if let Some(manifest_id) = nested.get("label").and_then(|v| v.as_str()) {
             ui.label(
-                egui::RichText::new(format!("Active manifest: {}", uri))
+                egui::RichText::new(format!("Manifest ID: {}", manifest_id))
                     .size(small)
                     .color(gray),
             );
         }
-    }
-    if let Some(nested) = nested_manifest_for_ingredient(manifest_value, ingredient) {
         let (claim_type, claim_gen, claim_gen_info) = manifest_claim_info(nested);
         if let Some(ct) = claim_type {
             ui.label(
@@ -795,20 +916,23 @@ fn ingredient_node_details(
                     .color(gray),
             );
         }
-        if let Some(ref gen) = claim_gen {
-            ui.label(
-                egui::RichText::new(format!("Claim generator: {}", gen))
-                    .size(small)
-                    .color(gray),
-            );
-        }
-        if let Some(ref info) = claim_gen_info {
-            ui.label(
-                egui::RichText::new(format!("Claim generator info: {}", info))
-                    .size(small)
-                    .color(gray),
-            );
-        }
+        let app_or_device = claim_gen_info
+            .as_deref()
+            .or(claim_gen.as_deref())
+            .unwrap_or("—");
+        ui.label(
+            egui::RichText::new(format!("App or device used: {}", app_or_device))
+                .size(small)
+                .color(gray),
+        );
+        let (ts_present, ts_authority) = timestamp_from_manifest(nested);
+        let ts_text = if ts_present {
+            let ca = ts_authority.as_deref().unwrap_or("—");
+            format!("Timestamp: Yes — {}", ca)
+        } else {
+            "Timestamp: No".to_string()
+        };
+        ui.label(egui::RichText::new(ts_text).size(small).color(gray));
         if let Some(dst) = manifest_digital_source_type(nested) {
             ui.label(
                 egui::RichText::new(format!("Digital source type: {}", dst))
@@ -816,7 +940,9 @@ fn ingredient_node_details(
                     .color(gray),
             );
         }
-        if let Some(trust) = trust_status_from_manifest(nested) {
+        let trust =
+            trust_status_from_manifest(nested).or_else(|| trust_status_from_ingredient(ingredient));
+        if let Some(trust) = trust {
             let (icon, color) = match trust.as_str() {
                 "signingCredential.trusted" => ("🔒", egui::Color32::from_rgb(0, 100, 0)),
                 "signingCredential.untrusted" => ("🔓", egui::Color32::from_rgb(255, 100, 100)),
@@ -834,6 +960,34 @@ fn ingredient_node_details(
                     .size(small)
                     .color(gray),
             );
+        }
+        let failures = get_validation_failures_for_manifest(nested);
+        if !failures.is_empty() {
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new("Validation failures (this manifest):")
+                    .size(small)
+                    .color(egui::Color32::from_rgb(255, 150, 150)),
+            );
+            for entry in &failures {
+                let line = if let Some(ref src) = entry.source {
+                    format!("  {} — {}", src, entry.code)
+                } else {
+                    format!("  {}", entry.code)
+                };
+                ui.label(
+                    egui::RichText::new(line)
+                        .size(small)
+                        .color(egui::Color32::from_rgb(255, 120, 120)),
+                );
+                if let Some(ref ex) = entry.explanation {
+                    ui.label(
+                        egui::RichText::new(format!("    {}", ex))
+                            .size(small - 1.0)
+                            .color(gray),
+                    );
+                }
+            }
         }
     }
 }

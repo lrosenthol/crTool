@@ -37,6 +37,8 @@ jsonschema = "0.23"
 [dev-dependencies]
 ed25519-dalek = "2.2"
 pem = "3.0"
+profile_evaluator_rs = { path = "../profile-evaluator-rs" }
+serde_yaml = "0.9"
 image = { version = "0.25", default-features = false, features = [
 	"jpeg",
 	"png",

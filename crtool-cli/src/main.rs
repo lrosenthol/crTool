@@ -13,17 +13,28 @@ governing permissions and limitations under the License.
 use anyhow::{Context, Result};
 use c2pa::Settings;
 use c2pa::{create_signer, Builder, CallbackSigner, Ingredient, Relationship, SigningAlg};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use crtool::{
     build_trust_settings, extract_crjson_manifest_with_settings, C2PA_TRUST_ANCHORS_URL,
     INTERIM_ALLOWED_LIST_URL, INTERIM_TRUST_ANCHORS_URL, INTERIM_TRUST_CONFIG_URL,
     SUPPORTED_ASSET_EXTENSIONS,
 };
 use glob::glob;
+use profile_evaluator_rs::{
+    evaluate_files as evaluate_profile_files, serialize_report, OutputFormat as ProfileOutputFormat,
+};
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
+
+/// Output format for the profile evaluation report
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+enum ReportFormat {
+    #[default]
+    Json,
+    Yaml,
+}
 
 /// Content Credential Tool - Create and embed C2PA manifests into media assets
 #[derive(Parser, Debug)]
@@ -81,6 +92,15 @@ struct Cli {
     /// Enable trust list validation: load the official C2PA trust list and the Content Credentials interim trust list for certificate validation during extract/read
     #[arg(long, default_value = "false")]
     trust: bool,
+
+    /// Path to the YAML asset profile for profile evaluation. When combined with --extract,
+    /// evaluates the extracted crJSON. When used alone, treats input files as crJSON indicators.
+    #[arg(long, value_name = "FILE")]
+    profile: Option<PathBuf>,
+
+    /// Output format for the profile evaluation report (json or yaml)
+    #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
+    report_format: ReportFormat,
 }
 
 /// Configuration for processing files with C2PA manifests
@@ -544,8 +564,9 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     Ok(signature.to_vec())
 }
 
-/// Extract C2PA manifest from a file and save it as crJSON
-fn extract_manifest(input_path: &Path, output_path: &Path, settings: &Settings) -> Result<()> {
+/// Extract C2PA manifest from a file and save it as crJSON.
+/// Returns the path of the written crJSON file.
+fn extract_manifest(input_path: &Path, output_path: &Path, settings: &Settings) -> Result<PathBuf> {
     if !input_path.exists() {
         anyhow::bail!("Input file does not exist: {:?}", input_path);
     }
@@ -598,7 +619,7 @@ fn extract_manifest(input_path: &Path, output_path: &Path, settings: &Settings) 
     println!("✓ Successfully extracted C2PA manifest");
     println!("  Output file: {:?}", final_output_path);
 
-    Ok(())
+    Ok(final_output_path)
 }
 
 /// Process a single input file with the manifest
@@ -813,6 +834,53 @@ fn validate_json_files(
     Ok(())
 }
 
+/// Evaluate a crJSON file against a YAML asset profile and write the report.
+/// The report is written to `<crjson_dir>/<crjson_stem>-report.<ext>`.
+fn run_profile_evaluation(
+    crjson_path: &Path,
+    profile_path: &Path,
+    format: ReportFormat,
+) -> Result<()> {
+    println!("Running profile evaluation...");
+    println!("  crJSON: {:?}", crjson_path);
+    println!("  Profile: {:?}", profile_path);
+
+    let output_format = match format {
+        ReportFormat::Json => ProfileOutputFormat::Json,
+        ReportFormat::Yaml => ProfileOutputFormat::Yaml,
+    };
+
+    let report = evaluate_profile_files(profile_path, crjson_path)
+        .context("Failed to evaluate profile against crJSON")?;
+
+    let serialized = serialize_report(&report, output_format)
+        .context("Failed to serialize evaluation report")?;
+
+    let ext = match format {
+        ReportFormat::Json => "json",
+        ReportFormat::Yaml => "yaml",
+    };
+
+    let stem = crjson_path
+        .file_stem()
+        .context("crJSON path has no filename")?
+        .to_str()
+        .context("Invalid UTF-8 in crJSON filename")?;
+
+    let report_filename = format!("{}-report.{}", stem, ext);
+    let report_path = crjson_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(&report_filename);
+
+    fs::write(&report_path, serialized).context("Failed to write evaluation report")?;
+
+    println!("✓ Profile evaluation complete");
+    println!("  Report: {:?}", report_path);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -834,7 +902,9 @@ fn main() -> Result<()> {
         }
     }
 
-    if !cli.validate {
+    // Skip extension check for validate mode and standalone profile evaluation (both accept JSON)
+    let standalone_eval = cli.profile.is_some() && !cli.extract && !cli.validate;
+    if !cli.validate && !standalone_eval {
         let unsupported: Vec<_> = input_files
             .iter()
             .filter(|p| !crtool::is_supported_asset_path(p))
@@ -857,6 +927,36 @@ fn main() -> Result<()> {
         return validate_json_files(&input_files, &schema_path, "crJSON");
     }
 
+    // Handle standalone profile evaluation mode: --profile without --extract
+    if standalone_eval {
+        let profile_path = cli.profile.as_ref().unwrap();
+        let mut success_count = 0;
+        let mut error_count = 0;
+
+        println!("=== Profile Evaluation ===");
+
+        for input_file in &input_files {
+            match run_profile_evaluation(input_file, profile_path, cli.report_format) {
+                Ok(_) => success_count += 1,
+                Err(e) => {
+                    eprintln!("Error evaluating {:?}: {}", input_file, e);
+                    error_count += 1;
+                }
+            }
+        }
+
+        println!("\n=== Evaluation Summary ===");
+        println!("  Successful: {}", success_count);
+        println!("  Failed: {}", error_count);
+        println!("  Total: {}", input_files.len());
+
+        if error_count > 0 {
+            anyhow::bail!("{} file(s) failed evaluation", error_count);
+        }
+
+        return Ok(());
+    }
+
     // Handle extract mode (always outputs crJSON)
     if cli.extract {
         let output = cli
@@ -875,7 +975,19 @@ fn main() -> Result<()> {
 
         for input_file in &input_files {
             match extract_manifest(input_file, &output, &extraction_settings) {
-                Ok(_) => success_count += 1,
+                Ok(crjson_path) => {
+                    success_count += 1;
+                    if let Some(profile_path) = &cli.profile {
+                        if let Err(e) =
+                            run_profile_evaluation(&crjson_path, profile_path, cli.report_format)
+                        {
+                            eprintln!(
+                                "Warning: profile evaluation failed for {:?}: {}",
+                                crjson_path, e
+                            );
+                        }
+                    }
+                }
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);
                     error_count += 1;
