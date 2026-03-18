@@ -1,0 +1,42 @@
+{
+  "testId": "validator.profile.violation.actions.inceptionWithoutIngredient",
+  "title": "Profile Violation — c2pa.cropped Without Required Parent Ingredient",
+  "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest that includes a c2pa.cropped action but no parentOf ingredient. An inception-type action that modifies a pre-existing asset MUST reference the source via a parentOf ingredient; omitting it is a profile violation.",
+  "specVersion": "2.2",
+  "inputAsset": "../../testfiles/Dog.jpg",
+  "manifest": {
+    "alg": "Ed25519",
+    "claim_generator_info": [
+      {
+        "name": "crTool/0.3.0",
+        "version": "0.3.0"
+      }
+    ],
+    "title": "tc-n-inception",
+    "assertions": [
+      {
+        "label": "c2pa.actions",
+        "data": {
+          "actions": [
+            {
+              "action": "c2pa.cropped",
+              "when": "2024-01-07T11:20:00Z",
+              "description": "Cropped to 16:9 aspect ratio"
+            }
+          ]
+        }
+      }
+    ],
+    "ingredients": []
+  },
+  "signingCert": "../../tests/fixtures/certs/ed25519.pub",
+  "signingKey": "../../tests/fixtures/certs/ed25519.pem",
+  "expectedResults": {
+    "validationStatus": [
+      {
+        "code": "claimSignature.validated",
+        "explanation": "The claim signature is cryptographically valid. The missing parentOf ingredient for a modification action is a profile-level violation."
+      }
+    ]
+  }
+}

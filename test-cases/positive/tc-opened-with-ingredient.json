@@ -1,0 +1,50 @@
+{
+  "testId": "validator.claimSignature.valid.openedWithIngredient",
+  "title": "Valid Claim Signature — c2pa.opened with Ingredient",
+  "description": "Verifies that a conformant validator correctly reports a valid claim signature for an asset that was opened from a parent ingredient. The ingredient is a real C2PA-signed JPEG referenced via ingredients_from_files.",
+  "specVersion": "2.2",
+  "inputAsset": "../../testfiles/Dog.jpg",
+  "manifest": {
+    "alg": "Ed25519",
+    "claim_generator_info": [
+      {
+        "name": "crTool/0.3.0",
+        "version": "0.3.0"
+      }
+    ],
+    "title": "tc-opened-with-ingredient",
+    "assertions": [
+      {
+        "label": "c2pa.actions",
+        "data": {
+          "actions": [
+            {
+              "action": "c2pa.opened",
+              "when": "2026-01-17T14:44:19.231Z",
+              "parameters": {
+                "ingredientIds": ["test_ingredient"]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "ingredients_from_files": [
+      {
+        "file_path": "../../testset/test_ingredient_manifest.jpg",
+        "label": "test_ingredient",
+        "relationship": "parentOf"
+      }
+    ]
+  },
+  "signingCert": "../../tests/fixtures/certs/ed25519.pub",
+  "signingKey": "../../tests/fixtures/certs/ed25519.pem",
+  "expectedResults": {
+    "validationStatus": [
+      {
+        "code": "claimSignature.validated",
+        "explanation": "The claim signature must be valid for an asset opened from a parent ingredient."
+      }
+    ]
+  }
+}

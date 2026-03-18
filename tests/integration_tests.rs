@@ -1681,122 +1681,88 @@ fn test_multiple_files_processing() -> Result<()> {
     let output_dir = common::output_dir().join("multi_file_test");
     fs::create_dir_all(&output_dir)?;
 
-    let manifest = manifests_dir().join("simple_manifest.json");
-    let cert = common::certs_dir().join("ed25519.pub");
-    let key = common::certs_dir().join("ed25519.pem");
-
-    // Get the binary path
     let binary_path = common::cli_binary_path();
+    let test_cases_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-cases");
 
-    // Test processing multiple files explicitly
-    let input1 = common::testfiles_dir().join("Dog.jpg");
-    let input2 = common::testfiles_dir().join("Dog.png");
+    // Use --create-test to produce two separate signed assets from two different test cases
+    let tc1 = test_cases_dir.join("positive/tc-created.json");
+    let tc2 = test_cases_dir.join("negative/tc-n-created-nodst.json");
+    let output1 = output_dir.join("tc-created.jpg");
+    let output2 = output_dir.join("tc-n-created-nodst.jpg");
 
-    let result = Command::new(binary_path)
-        .arg("--manifest")
-        .arg(&manifest)
-        .arg(&input1)
-        .arg(&input2)
+    let result1 = Command::new(&binary_path)
+        .arg("--create-test")
+        .arg(&tc1)
         .arg("--output")
-        .arg(&output_dir)
-        .arg("--cert")
-        .arg(&cert)
-        .arg("--key")
-        .arg(&key)
-        .arg("--allow-self-signed")
+        .arg(&output1)
         .output()?;
 
     assert!(
-        result.status.success(),
-        "Command failed: {}",
-        String::from_utf8_lossy(&result.stderr)
+        result1.status.success(),
+        "First --create-test invocation failed: {}",
+        String::from_utf8_lossy(&result1.stderr)
     );
 
-    // Verify both output files were created
-    let output1 = output_dir.join("Dog.jpg");
-    let output2 = output_dir.join("Dog.png");
+    let result2 = Command::new(&binary_path)
+        .arg("--create-test")
+        .arg(&tc2)
+        .arg("--output")
+        .arg(&output2)
+        .output()?;
 
-    assert!(output1.exists(), "Output file Dog.jpg should exist");
-    assert!(output2.exists(), "Output file Dog.png should exist");
+    assert!(
+        result2.status.success(),
+        "Second --create-test invocation failed: {}",
+        String::from_utf8_lossy(&result2.stderr)
+    );
 
-    // Verify both files have valid C2PA manifests
+    // Verify both output files have valid C2PA manifests
     let reader1 = verify_signed_file(&output1)?;
     assert!(reader1.active_label().is_some());
 
     let reader2 = verify_signed_file(&output2)?;
     assert!(reader2.active_label().is_some());
 
-    println!("✓ Multiple files processing test passed");
+    println!("✓ Multiple --create-test invocations test passed");
 
     Ok(())
 }
 
 #[test]
-fn test_glob_pattern_processing() -> Result<()> {
+fn test_create_test_with_ingredient() -> Result<()> {
     use std::process::Command;
 
-    let output_dir = common::output_dir().join("glob_test");
+    let output_dir = common::output_dir().join("create_test_ingredient");
     fs::create_dir_all(&output_dir)?;
 
-    let manifest = manifests_dir().join("simple_manifest.json");
-    let cert = common::certs_dir().join("ed25519.pub");
-    let key = common::certs_dir().join("ed25519.pem");
-
-    // Get the binary path
     let binary_path = common::cli_binary_path();
+    let test_cases_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-cases");
 
-    // Test processing files with glob pattern
-    let testfiles = common::testfiles_dir();
-    let pattern = format!("{}/*.jpg", testfiles.display());
+    // Use a test case that embeds a real ingredient file
+    let tc = test_cases_dir.join("positive/tc-placed-with-ingredient.json");
+    let output = output_dir.join("tc-placed-with-ingredient.jpg");
 
-    let result = Command::new(binary_path)
-        .arg("--manifest")
-        .arg(&manifest)
-        .arg(&pattern)
+    let result = Command::new(&binary_path)
+        .arg("--create-test")
+        .arg(&tc)
         .arg("--output")
-        .arg(&output_dir)
-        .arg("--cert")
-        .arg(&cert)
-        .arg("--key")
-        .arg(&key)
-        .arg("--allow-self-signed")
+        .arg(&output)
         .output()?;
 
     assert!(
         result.status.success(),
-        "Command failed: {}",
+        "--create-test with ingredient failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
 
-    // Verify that at least some output files were created
-    let entries: Vec<_> = fs::read_dir(&output_dir)?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|s| s == "jpg")
-                .unwrap_or(false)
-        })
-        .collect();
-
+    // Verify the output has a valid C2PA manifest
+    let reader = verify_signed_file(&output)?;
     assert!(
-        !entries.is_empty(),
-        "Should have created at least one output file"
+        reader.active_label().is_some(),
+        "Output file should have a C2PA manifest"
     );
 
-    // Verify all output files have valid C2PA manifests
-    for entry in entries {
-        let path = entry.path();
-        let reader = verify_signed_file(&path)?;
-        assert!(
-            reader.active_label().is_some(),
-            "File {:?} should have a C2PA manifest",
-            path
-        );
-    }
-
-    println!("✓ Glob pattern processing test passed");
+    println!("✓ --create-test with ingredient test passed");
 
     Ok(())
 }
@@ -1862,38 +1828,24 @@ fn test_multiple_files_extract() -> Result<()> {
 fn test_multi_file_error_handling() -> Result<()> {
     use std::process::Command;
 
-    let output_dir = common::output_dir().join("multi_file_error_test");
-    fs::create_dir_all(&output_dir)?;
-
-    let manifest = manifests_dir().join("simple_manifest.json");
-    let cert = common::certs_dir().join("ed25519.pub");
-    let key = common::certs_dir().join("ed25519.pem");
-
-    // Get the binary path
     let binary_path = common::cli_binary_path();
+    let test_cases_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-cases");
 
-    // Test with one valid file and one non-existent file
-    let input1 = common::testfiles_dir().join("Dog.jpg");
-    let input2 = common::testfiles_dir().join("NonExistent.jpg");
+    // Use a non-existent test case file — should fail
+    let nonexistent_tc = test_cases_dir.join("positive/nonexistent-test-case.json");
+    let output = common::output_dir().join("multi_file_error_test/output.jpg");
 
-    let result = Command::new(binary_path)
-        .arg("--manifest")
-        .arg(&manifest)
-        .arg(&input1)
-        .arg(&input2)
+    let result = Command::new(&binary_path)
+        .arg("--create-test")
+        .arg(&nonexistent_tc)
         .arg("--output")
-        .arg(&output_dir)
-        .arg("--cert")
-        .arg(&cert)
-        .arg("--key")
-        .arg(&key)
-        .arg("--allow-self-signed")
+        .arg(&output)
         .output()?;
 
-    // Should fail because one file doesn't exist
+    // Should fail because the test case file doesn't exist
     assert!(
         !result.status.success(),
-        "Command should fail with non-existent input file"
+        "Command should fail with non-existent test case file"
     );
 
     println!("✓ Multi-file error handling test passed");
@@ -1902,49 +1854,33 @@ fn test_multi_file_error_handling() -> Result<()> {
 }
 
 #[test]
-fn test_multi_file_requires_directory_output() -> Result<()> {
+fn test_create_test_missing_output_fails() -> Result<()> {
     use std::process::Command;
 
-    let manifest = manifests_dir().join("simple_manifest.json");
-    let cert = common::certs_dir().join("ed25519.pub");
-    let key = common::certs_dir().join("ed25519.pem");
-
-    // Get the binary path
     let binary_path = common::cli_binary_path();
+    let test_cases_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-cases");
+    let tc = test_cases_dir.join("positive/tc-created.json");
 
-    let input1 = common::testfiles_dir().join("Dog.jpg");
-    let input2 = common::testfiles_dir().join("Dog.png");
-
-    // Try to use a non-directory output path with multiple inputs
-    let output_file = common::output_dir().join("single_output.jpg");
-
-    let result = Command::new(binary_path)
-        .arg("--manifest")
-        .arg(&manifest)
-        .arg(&input1)
-        .arg(&input2)
-        .arg("--output")
-        .arg(&output_file)
-        .arg("--cert")
-        .arg(&cert)
-        .arg("--key")
-        .arg(&key)
-        .arg("--allow-self-signed")
+    // --create-test without --output should fail
+    let result = Command::new(&binary_path)
+        .arg("--create-test")
+        .arg(&tc)
         .output()?;
 
-    // Should fail because output is not a directory
+    // Should fail because --output is required with --create-test
     assert!(
         !result.status.success(),
-        "Command should fail when output is not a directory with multiple inputs"
+        "Command should fail when --output is missing with --create-test"
     );
 
     let stderr = String::from_utf8_lossy(&result.stderr);
     assert!(
-        stderr.contains("directory"),
-        "Error message should mention directory requirement"
+        stderr.contains("--output"),
+        "Error message should mention --output requirement: {}",
+        stderr
     );
 
-    println!("✓ Multi-file directory requirement test passed");
+    println!("✓ --create-test missing --output test passed");
 
     Ok(())
 }

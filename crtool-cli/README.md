@@ -19,16 +19,13 @@ Full option list and examples are in the root [README](../README.md). Key option
 
 | Option | Description |
 |--------|-------------|
-| `-m, --manifest <FILE>` | JSON manifest config (required for signing) |
-| `-o, --output <PATH>` | Output file or directory (required for signing/extract) |
-| `-c, --cert`, `-k, --key` | Certificate and private key (required for signing) |
+| `-t, --create-test <FILE>` | Create a signed test asset from a test case JSON file |
+| `-o, --output <PATH>` | Output file or directory (required for `--create-test` and `--extract`) |
 | `-e, --extract` | Extract manifest to crJSON (read-only) |
 | `--trust` | Enable C2PA and Content Credentials trust list validation for extract/read |
 | `-v, --validate` | Validate JSON files against crJSON schema |
-| `--allow-self-signed` | Allow self-signed certs (testing only) |
-| `--ingredients-dir <DIR>` | Base dir for `ingredients_from_files` paths |
-| `--thumbnail-asset`, `--thumbnail-ingredients` | Generate thumbnails |
-| `-a, --algorithm` | Signing algorithm (optional; auto-detected from cert if omitted) |
+| `--profile <FILE>` | YAML asset profile for profile evaluation |
+| `--report-format <FORMAT>` | Report format for profile evaluation: `json` (default) or `yaml` |
 
 ## Dependencies
 

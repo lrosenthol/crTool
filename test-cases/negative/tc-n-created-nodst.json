@@ -1,0 +1,41 @@
+{
+  "testId": "validator.profile.violation.created.noDigitalSourceType",
+  "title": "Profile Violation — c2pa.created Missing digitalSourceType",
+  "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest where the c2pa.created action is missing the required digitalSourceType field. The signature itself is valid; the non-conformance is a profile-level violation that a profile-aware validator MUST flag separately.",
+  "specVersion": "2.2",
+  "inputAsset": "../../testfiles/Dog.jpg",
+  "manifest": {
+    "alg": "Ed25519",
+    "claim_generator_info": [
+      {
+        "name": "crTool/0.3.0",
+        "version": "0.3.0"
+      }
+    ],
+    "title": "tc-n-created-nodst",
+    "assertions": [
+      {
+        "label": "c2pa.actions",
+        "data": {
+          "actions": [
+            {
+              "action": "c2pa.created",
+              "when": "2026-01-17T14:44:19.231Z"
+            }
+          ]
+        }
+      }
+    ],
+    "ingredients": []
+  },
+  "signingCert": "../../tests/fixtures/certs/ed25519.pub",
+  "signingKey": "../../tests/fixtures/certs/ed25519.pem",
+  "expectedResults": {
+    "validationStatus": [
+      {
+        "code": "claimSignature.validated",
+        "explanation": "The claim signature is cryptographically valid even though the manifest is non-conformant at the profile level (missing digitalSourceType)."
+      }
+    ]
+  }
+}

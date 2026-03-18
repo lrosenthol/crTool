@@ -1,0 +1,47 @@
+{
+  "testId": "validator.profile.violation.actions.removed",
+  "title": "Profile Violation — c2pa.removed Action",
+  "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest that includes a c2pa.removed action, which is not a valid C2PA action type. The signature is valid; the non-conformance is detected at the profile evaluation level.",
+  "specVersion": "2.2",
+  "inputAsset": "../../testfiles/Dog.jpg",
+  "manifest": {
+    "alg": "Ed25519",
+    "claim_generator_info": [
+      {
+        "name": "crTool/0.3.0",
+        "version": "0.3.0"
+      }
+    ],
+    "title": "tc-n-removed",
+    "assertions": [
+      {
+        "label": "c2pa.actions",
+        "data": {
+          "actions": [
+            {
+              "action": "c2pa.created",
+              "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+              "when": "2026-01-17T14:44:19.231Z"
+            },
+            {
+              "action": "c2pa.removed",
+              "when": "2026-01-17T15:44:19.231Z",
+              "parameters": {}
+            }
+          ]
+        }
+      }
+    ],
+    "ingredients": []
+  },
+  "signingCert": "../../tests/fixtures/certs/ed25519.pub",
+  "signingKey": "../../tests/fixtures/certs/ed25519.pem",
+  "expectedResults": {
+    "validationStatus": [
+      {
+        "code": "claimSignature.validated",
+        "explanation": "The claim signature is cryptographically valid. The c2pa.removed action is not a valid C2PA action and should be flagged by a profile-aware validator."
+      }
+    ]
+  }
+}
