@@ -26,6 +26,11 @@ Full option list and examples are in the root [README](../README.md). Key option
 | `-v, --validate` | Validate JSON files against crJSON schema |
 | `--profile <FILE>` | YAML asset profile for profile evaluation |
 | `--report-format <FORMAT>` | Report format for profile evaluation: `json` (default) or `yaml` |
+| `-b, --batch <FILE>` | Run multiple commands in sequence from a batch JSON file |
+| `-q, --quiet` | Suppress progress output (errors still shown on stderr) |
+| `-l, --log <FILE>` | Write all progress output to a log file (in addition to stdout) |
+| `-h, --help` | Print help |
+| `-V, --version` | Print version |
 
 ## Dependencies
 

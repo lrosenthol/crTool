@@ -10,13 +10,13 @@ A Rust-based tool (CLI and GUI) that uses the [c2pa-rs](https://github.com/conte
 ## Features
 
 - 🧪 **Test asset creation** — create signed C2PA assets from structured test case JSON files
-- 🔐 Sign with various cryptographic algorithms (ES256, ES384, ES512, PS256, PS384, PS512, ED25519)
-- 🖼️ Support for multiple media formats (JPEG, PNG, and more)
+- 🔐 **Sign with various cryptographic algorithms** (ES256, ES384, ES512, PS256, PS384, PS512, ED25519)
+- 🖼️ **Support for multiple media formats** (JPEG, PNG, and more)
 - 🧩 **File-based ingredient loading** — automatically load and embed parent/component ingredients
 - 📤 **Extract manifests** — extract C2PA manifests from signed files to crJSON format
 - ✅ **JSON Schema validation** — validate crJSON manifests against the crJSON schema
 - 📊 **Profile evaluation** — evaluate crJSON against YAML asset profiles
-- ⚡ Built with Rust for performance and safety
+- ⚡ **Built with Rust** for performance and safety
 
 ## Installation
 
@@ -82,14 +82,15 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow informati
 
 ### Modes of Operation
 
-The CLI has four distinct modes:
+The CLI has four distinct modes, plus a batch mode for running multiple commands in one go:
 
-| Mode | Flag | Description |
-|------|------|-------------|
-| **Create test asset** | `-t, --create-test <FILE>` | Read a test case JSON file and produce a signed asset |
-| **Extract** | `-e, --extract` | Extract C2PA manifest from a signed asset to crJSON |
-| **Validate** | `-v, --validate` | Validate JSON files against the crJSON schema |
-| **Profile evaluation** | `--profile <FILE>` | Evaluate crJSON against a YAML asset profile |
+| Mode                   | Flag                       | Description                                              |
+| ---------------------- | -------------------------- | -------------------------------------------------------- |
+| **Create test asset**  | `-t, --create-test <FILE>` | Read a test case JSON file and produce a signed asset    |
+| **Extract**            | `-e, --extract`            | Extract C2PA manifest from a signed asset to crJSON      |
+| **Validate**           | `-v, --validate`           | Validate JSON files against the crJSON schema            |
+| **Profile evaluation** | `--profile <FILE>`         | Evaluate crJSON against a YAML asset profile             |
+| **Batch**              | `-b, --batch <FILE>`       | Run multiple commands in sequence from a batch JSON file |
 
 ### Options
 
@@ -101,6 +102,11 @@ The CLI has four distinct modes:
 - `-v, --validate`: Validate one or more JSON files against the crJSON schema.
 - `--profile <FILE>`: Path to a YAML asset profile. When combined with `--extract`, evaluates the extracted crJSON immediately. When used alone (without `--extract`), treats input files as crJSON.
 - `--report-format <FORMAT>`: Output format for the profile evaluation report. Options: `json` (default) or `yaml`.
+- `-b, --batch <FILE>`: Path to a batch JSON file. Runs each command entry in sequence (see [Batch Mode](#batch-mode)).
+- `-q, --quiet`: Suppress all progress output. Errors are still written to stderr.
+- `-l, --log <FILE>`: Write all progress output to the specified log file in addition to stdout.
+- `-h, --help`: Print help and exit.
+- `-V, --version`: Print the tool version and exit.
 
 ---
 
@@ -148,27 +154,25 @@ Test case files follow the schema defined in `INTERNAL/schemas/test-case.schema.
   "signingCert": "../../tests/fixtures/certs/ed25519.pub",
   "signingKey": "../../tests/fixtures/certs/ed25519.pem",
   "expectedResults": {
-    "validationStatus": [
-      { "code": "claimSignature.validated" }
-    ]
+    "validationStatus": [{ "code": "claimSignature.validated" }]
   }
 }
 ```
 
 **Fields:**
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `testId` | Yes | Unique identifier for the test case |
-| `title` | No | Human-readable title |
-| `description` | No | Description of what the test verifies |
-| `specVersion` | No | C2PA specification version |
-| `inputAsset` | No | Path to the input media file (relative to this JSON file). Can be omitted when an input file is supplied on the command line, which always takes precedence. An error is returned if neither is provided. |
-| `manifest` | Yes | C2PA manifest object. The optional `alg` field sets the signing algorithm; if omitted, the algorithm is auto-detected from `signingCert`. |
-| `signingCert` | Yes | Path to the signing certificate in PEM format (relative to this JSON file) |
-| `signingKey` | No | Path to the private key in PEM format. Defaults to `signingCert` if omitted. |
-| `tsaUrl` | No | Timestamp Authority URL |
-| `expectedResults` | Yes | Expected validation results (used by validators, not the tool itself) |
+| Field             | Required | Description                                                                                                                                                                                               |
+| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `testId`          | Yes      | Unique identifier for the test case                                                                                                                                                                       |
+| `title`           | No       | Human-readable title                                                                                                                                                                                      |
+| `description`     | No       | Description of what the test verifies                                                                                                                                                                     |
+| `specVersion`     | No       | C2PA specification version                                                                                                                                                                                |
+| `inputAsset`      | No       | Path to the input media file (relative to this JSON file). Can be omitted when an input file is supplied on the command line, which always takes precedence. An error is returned if neither is provided. |
+| `manifest`        | Yes      | C2PA manifest object. The optional `alg` field sets the signing algorithm; if omitted, the algorithm is auto-detected from `signingCert`.                                                                 |
+| `signingCert`     | Yes      | Path to the signing certificate in PEM format (relative to this JSON file)                                                                                                                                |
+| `signingKey`      | No       | Path to the private key in PEM format. Defaults to `signingCert` if omitted.                                                                                                                              |
+| `tsaUrl`          | No       | Timestamp Authority URL                                                                                                                                                                                   |
+| `expectedResults` | Yes      | Expected validation results (used by validators, not the tool itself)                                                                                                                                     |
 
 **Algorithm auto-detection:** If `manifest.alg` is absent, the tool examines `signingCert` to determine the algorithm automatically (ES256/ES384/ES512 from ECDSA curve, Ed25519 from Ed25519 key, PS256 from RSA key).
 
@@ -308,6 +312,59 @@ Evaluate a crJSON file against a YAML asset profile using `--profile`. The profi
 
 ---
 
+## Batch Mode
+
+Use `-b`/`--batch` to execute multiple commands in sequence from a single JSON file. The batch file is an array of command objects; each entry is run in order and a summary is printed at the end.
+
+```bash
+./target/release/crTool --batch my-batch.json
+
+# Quiet: suppress progress, errors still shown
+./target/release/crTool --batch my-batch.json --quiet
+
+# Log all output to a file as well as stdout
+./target/release/crTool --batch my-batch.json --log run.log
+```
+
+### Batch file format
+
+```json
+[
+  {
+    "command": "extract",
+    "arguments": ["-o", "output/"],
+    "inputFiles": ["input.jpg"]
+  },
+  {
+    "command": "profile",
+    "arguments": ["-o", "output/", "--profile", "profile.yaml"],
+    "inputFiles": ["input.jpg"]
+  },
+  {
+    "command": "test-cases",
+    "arguments": [
+      "--create-test",
+      "test-cases/positive/tc-created.json",
+      "-o",
+      "output/"
+    ],
+    "inputFiles": ["input.jpg"]
+  }
+]
+```
+
+| Field        | Required | Description                                                             |
+| ------------ | -------- | ----------------------------------------------------------------------- |
+| `command`    | Yes      | Operation to perform: `extract`, `profile`, `test-cases`, or `validate` |
+| `arguments`  | No       | Additional CLI arguments for the operation                              |
+| `inputFiles` | No       | Input file paths or glob patterns                                       |
+
+The JSON schema for batch files is at `INTERNAL/schemas/batch.schema.json`.
+
+The `command` field sets the mode. For `extract` and `validate`, the corresponding flag (`--extract` / `--validate`) is injected automatically if not already present in `arguments`. For `profile` and `test-cases`, the required flags (`--profile` and `--create-test`) must appear in `arguments`.
+
+---
+
 ## Manifest JSON Format
 
 The `manifest` object inside a test case file follows the c2pa-rs JSON manifest format:
@@ -389,13 +446,14 @@ Each ingredient entry supports:
 
 The CLI (`crtool-cli`) is split into focused source modules:
 
-| Module | Responsibility |
-|--------|---------------|
-| `main.rs` | CLI argument parsing (`clap`), mode dispatch |
-| `processing.rs` | C2PA manifest signing, ingredient loading, algorithm detection |
-| `test_case.rs` | Test case JSON deserialization, `--create-test` mode |
+| Module          | Responsibility                                                                  |
+| --------------- | ------------------------------------------------------------------------------- |
+| `main.rs`       | CLI argument parsing (`clap`), `Logger`, mode dispatch, `run_cli`               |
+| `batch.rs`      | Batch file parsing and sequential command execution (`--batch`)                 |
+| `processing.rs` | C2PA manifest signing, ingredient loading, algorithm detection                  |
+| `test_case.rs`  | Test case JSON deserialization, `--create-test` mode                            |
 | `extraction.rs` | Manifest extraction, crJSON output, JSON schema validation, trust list fetching |
-| `profile.rs` | Profile evaluation, report serialization |
+| `profile.rs`    | Profile evaluation, report serialization                                        |
 
 The core library (`crtool`) provides manifest extraction/validation logic and schema paths shared between the CLI and GUI.
 
@@ -530,6 +588,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow and best 
 ### Build Errors
 
 Ensure you have:
+
 1. The latest Rust toolchain (`rustup update`)
 2. Required system libraries (OpenSSL, etc.)
 3. A C/C++ compiler installed

@@ -10,6 +10,7 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+mod batch;
 mod extraction;
 mod processing;
 mod profile;
@@ -21,20 +22,65 @@ use crtool::SUPPORTED_ASSET_EXTENSIONS;
 use extraction::{extract_manifest, extraction_settings, validate_json_files};
 use glob::glob;
 use profile::{run_profile_evaluation, ReportFormat};
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use test_case::handle_create_test;
+
+// ─── Logger ──────────────────────────────────────────────────────────────────
+
+/// Output manager: writes progress to stdout (unless quiet) and optionally to a log file.
+pub struct Logger {
+    quiet: bool,
+    log_writer: Option<BufWriter<std::fs::File>>,
+}
+
+impl Logger {
+    pub fn new(quiet: bool, log_path: Option<&std::path::Path>) -> Result<Self> {
+        let log_writer = if let Some(path) = log_path {
+            let file = std::fs::File::create(path)
+                .with_context(|| format!("Failed to create log file: {}", path.display()))?;
+            eprintln!("📝 Logging to: {}", path.display());
+            Some(BufWriter::new(file))
+        } else {
+            None
+        };
+        Ok(Self { quiet, log_writer })
+    }
+
+    /// Print informational message to stdout (suppressed by --quiet) and log file.
+    pub fn info(&mut self, msg: &str) {
+        if !self.quiet {
+            println!("{msg}");
+        }
+        if let Some(w) = &mut self.log_writer {
+            let _ = writeln!(w, "{msg}");
+        }
+    }
+
+    /// Print error message to stderr (never suppressed) and log file.
+    pub fn error(&mut self, msg: &str) {
+        eprintln!("{msg}");
+        if let Some(w) = &mut self.log_writer {
+            let _ = writeln!(w, "ERROR: {msg}");
+        }
+    }
+}
+
+// ─── CLI definition ───────────────────────────────────────────────────────────
 
 /// Content Credential Tool - Create and embed C2PA manifests into media assets
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Cli {
+pub struct Cli {
     /// Path to a test case JSON file (C2PA validator test case schema).
     /// Reads all signing configuration (manifest, cert, key, algorithm, TSA URL) from the file.
     /// Use with -o to specify the output file path.
     #[arg(short = 't', long = "create-test", value_name = "FILE")]
     create_test: Option<PathBuf>,
 
-    /// Path(s) to input media asset(s). Supported: avi, avif, c2pa, dng, gif, heic, heif, jpg/jpeg, m4a, mov, mp3, mp4, pdf, png, svg, tiff, wav, webp. Supports glob patterns (e.g., "*.jpg", "images/*.png")
+    /// Path(s) to input media asset(s). Supported: avi, avif, c2pa, dng, gif, heic, heif,
+    /// jpg/jpeg, m4a, mov, mp3, mp4, pdf, png, svg, tiff, wav, webp.
+    /// Supports glob patterns (e.g., "*.jpg", "images/*.png")
     #[arg(value_name = "INPUT_FILE", required = false, num_args = 0..)]
     input: Vec<String>,
 
@@ -50,7 +96,8 @@ struct Cli {
     #[arg(short = 'v', long, default_value = "false")]
     validate: bool,
 
-    /// Enable trust list validation: load the official C2PA trust list and the Content Credentials interim trust list for certificate validation during extract/read
+    /// Enable trust list validation: load the official C2PA trust list and the Content
+    /// Credentials interim trust list for certificate validation during extract/read
     #[arg(long, default_value = "false")]
     trust: bool,
 
@@ -62,10 +109,24 @@ struct Cli {
     /// Output format for the profile evaluation report (json or yaml)
     #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
     report_format: ReportFormat,
+
+    /// Path to a batch JSON file — runs multiple commands in sequence
+    #[arg(short = 'b', long = "batch", value_name = "FILE")]
+    batch: Option<PathBuf>,
+
+    /// Suppress progress output (errors are still shown on stderr)
+    #[arg(short = 'q', long = "quiet", default_value = "false")]
+    quiet: bool,
+
+    /// Write all progress output to a log file (in addition to stdout)
+    #[arg(short = 'l', long = "log", value_name = "FILE")]
+    log: Option<PathBuf>,
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 /// Expand glob patterns and collect matching file paths.
-fn expand_input_patterns(patterns: &[String]) -> Result<Vec<PathBuf>> {
+pub fn expand_input_patterns(patterns: &[String]) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
     for pattern in patterns {
@@ -93,9 +154,10 @@ fn expand_input_patterns(patterns: &[String]) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
+// ─── Core execution ───────────────────────────────────────────────────────────
 
+/// Execute a parsed CLI command. Called from both normal mode and batch mode.
+pub fn run_cli(cli: Cli, logger: &mut Logger) -> Result<()> {
     // Handle --create-test mode before anything else (no positional input required)
     if let Some(test_case_path) = &cli.create_test {
         let output = cli
@@ -107,7 +169,6 @@ fn main() -> Result<()> {
             return handle_create_test(test_case_path, None, &output);
         }
 
-        // CLI inputs override the JSON inputAsset field
         let input_files =
             expand_input_patterns(&cli.input).context("Failed to expand input file patterns")?;
 
@@ -118,28 +179,32 @@ fn main() -> Result<()> {
             );
         }
 
-        let mut success_count = 0;
-        let mut error_count = 0;
+        let mut success_count = 0u32;
+        let mut error_count = 0u32;
 
         for input_file in &input_files {
+            logger.info(&format!("  📄 Processing: {} ...", input_file.display()));
             match handle_create_test(test_case_path, Some(input_file), &output) {
-                Ok(_) => success_count += 1,
+                Ok(_) => {
+                    logger.info("     ✅ Done");
+                    success_count += 1;
+                }
                 Err(e) => {
-                    eprintln!("Error processing {:?}: {}", input_file, e);
+                    logger.error(&format!("     ❌ Error: {e}"));
                     error_count += 1;
                 }
             }
         }
 
         if input_files.len() > 1 {
-            println!("\n=== Test Asset Creation Summary ===");
-            println!("  Successful: {}", success_count);
-            println!("  Failed: {}", error_count);
-            println!("  Total: {}", input_files.len());
+            logger.info(&format!(
+                "\n📊 Test Asset Creation: {success_count} succeeded, {error_count} failed, {} total",
+                input_files.len()
+            ));
         }
 
         if error_count > 0 {
-            anyhow::bail!("{} file(s) failed to create test asset", error_count);
+            anyhow::bail!("{error_count} file(s) failed to create test asset");
         }
 
         return Ok(());
@@ -185,45 +250,52 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("Found {} input file(s) to process", input_files.len());
+    logger.info(&format!(
+        "🚀 Processing {} input file(s)",
+        input_files.len()
+    ));
 
-    // Handle validation mode (validates against crJSON schema)
+    // ── Validate mode ─────────────────────────────────────────────────────────
     if cli.validate {
         let schema_path = crtool::crjson_schema_path();
         return validate_json_files(&input_files, &schema_path, "crJSON");
     }
 
-    // Handle standalone profile evaluation mode: --profile without --extract
+    // ── Standalone profile evaluation mode: --profile without --extract ───────
     if standalone_eval {
         let profile_path = cli.profile.as_ref().unwrap();
-        let mut success_count = 0;
-        let mut error_count = 0;
+        let mut success_count = 0u32;
+        let mut error_count = 0u32;
 
-        println!("=== Profile Evaluation ===");
+        logger.info("=== Profile Evaluation ===");
 
         for input_file in &input_files {
+            logger.info(&format!("  📄 Processing: {} ...", input_file.display()));
             match run_profile_evaluation(input_file, profile_path, cli.report_format) {
-                Ok(_) => success_count += 1,
+                Ok(_) => {
+                    logger.info("     ✅ Done");
+                    success_count += 1;
+                }
                 Err(e) => {
-                    eprintln!("Error evaluating {:?}: {}", input_file, e);
+                    logger.error(&format!("     ❌ Error: {e}"));
                     error_count += 1;
                 }
             }
         }
 
-        println!("\n=== Evaluation Summary ===");
-        println!("  Successful: {}", success_count);
-        println!("  Failed: {}", error_count);
-        println!("  Total: {}", input_files.len());
+        logger.info(&format!(
+            "\n📊 Evaluation Summary: {success_count} succeeded, {error_count} failed, {} total",
+            input_files.len()
+        ));
 
         if error_count > 0 {
-            anyhow::bail!("{} file(s) failed evaluation", error_count);
+            anyhow::bail!("{error_count} file(s) failed evaluation");
         }
 
         return Ok(());
     }
 
-    // Handle extract mode (always outputs crJSON)
+    // ── Extract mode ──────────────────────────────────────────────────────────
     if cli.extract {
         let output = cli
             .output
@@ -236,38 +308,40 @@ fn main() -> Result<()> {
             );
         }
 
-        let mut success_count = 0;
-        let mut error_count = 0;
+        let mut success_count = 0u32;
+        let mut error_count = 0u32;
 
         for input_file in &input_files {
+            logger.info(&format!("  📄 Processing: {} ...", input_file.display()));
             match extract_manifest(input_file, &output, &extraction_settings) {
                 Ok(crjson_path) => {
+                    logger.info("     ✅ Done");
                     success_count += 1;
                     if let Some(profile_path) = &cli.profile {
                         if let Err(e) =
                             run_profile_evaluation(&crjson_path, profile_path, cli.report_format)
                         {
-                            eprintln!(
-                                "Warning: profile evaluation failed for {:?}: {}",
-                                crjson_path, e
-                            );
+                            logger.error(&format!(
+                                "     ⚠️  Profile evaluation failed for {}: {e}",
+                                crjson_path.display()
+                            ));
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error processing {:?}: {}", input_file, e);
+                    logger.error(&format!("     ❌ Error: {e}"));
                     error_count += 1;
                 }
             }
         }
 
-        println!("\n=== Extraction Summary ===");
-        println!("  Successful: {}", success_count);
-        println!("  Failed: {}", error_count);
-        println!("  Total: {}", input_files.len());
+        logger.info(&format!(
+            "\n📊 Extraction Summary: {success_count} succeeded, {error_count} failed, {} total",
+            input_files.len()
+        ));
 
         if error_count > 0 {
-            anyhow::bail!("{} file(s) failed to extract", error_count);
+            anyhow::bail!("{error_count} file(s) failed to extract");
         }
 
         return Ok(());
@@ -275,6 +349,22 @@ fn main() -> Result<()> {
 
     anyhow::bail!(
         "No operation specified. Use --create-test FILE to create a test asset, \
-        --extract to extract a manifest, or --validate to validate JSON files."
+        --extract to extract a manifest, --validate to validate JSON files, or \
+        --batch FILE to run a batch of commands."
     );
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    let mut logger = Logger::new(cli.quiet, cli.log.as_deref())?;
+
+    // ── Batch mode ────────────────────────────────────────────────────────────
+    if let Some(batch_path) = &cli.batch.clone() {
+        return batch::run_batch(batch_path, &mut logger);
+    }
+
+    run_cli(cli, &mut logger)
 }
