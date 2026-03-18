@@ -18,7 +18,7 @@
         "type": "array",
         "items": { "type": "string" },
         "default": [],
-        "description": "Additional command-line arguments for the operation (e.g. [\"-o\", \"output/\", \"--profile\", \"profile.yaml\"])."
+        "description": "Additional command-line arguments for the operation (e.g. [\"-o\", \"output/\", \"--profile\", \"profile.yaml\"]). For 'test-cases', the --create-test value accepts a glob pattern (e.g. [\"--create-test\", \"test-cases/positive/tc-*.json\", \"-o\", \"output/\"])."
       },
       "inputFiles": {
         "type": "array",

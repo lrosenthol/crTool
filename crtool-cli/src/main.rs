@@ -72,11 +72,12 @@ impl Logger {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    /// Path to a test case JSON file (C2PA validator test case schema).
-    /// Reads all signing configuration (manifest, cert, key, algorithm, TSA URL) from the file.
-    /// Use with -o to specify the output file path.
-    #[arg(short = 't', long = "create-test", value_name = "FILE")]
-    create_test: Option<PathBuf>,
+    /// Path or glob pattern for test case JSON file(s) (C2PA validator test case schema).
+    /// Supports glob patterns (e.g., "test-cases/positive/tc-*.json", "test-cases/**/*.json").
+    /// Reads all signing configuration (manifest, cert, key, algorithm, TSA URL) from each file.
+    /// Use with -o to specify the output file or directory (directory required for multiple matches).
+    #[arg(short = 't', long = "create-test", value_name = "PATTERN")]
+    create_test: Option<String>,
 
     /// Path(s) to input media asset(s). Supported: avi, avif, c2pa, dng, gif, heic, heif,
     /// jpg/jpeg, m4a, mov, mp3, mp4, pdf, png, svg, tiff, wav, webp.
@@ -159,22 +160,30 @@ pub fn expand_input_patterns(patterns: &[String]) -> Result<Vec<PathBuf>> {
 /// Execute a parsed CLI command. Called from both normal mode and batch mode.
 pub fn run_cli(cli: Cli, logger: &mut Logger) -> Result<()> {
     // Handle --create-test mode before anything else (no positional input required)
-    if let Some(test_case_path) = &cli.create_test {
+    if let Some(test_case_pattern) = &cli.create_test {
         let output = cli
             .output
             .context("--output is required when using --create-test mode")?;
 
-        if cli.input.is_empty() {
-            // No CLI inputs: let handle_create_test use inputAsset from JSON (or error)
-            return handle_create_test(test_case_path, None, &output);
+        // Expand the pattern (or exact path) to a list of test case files
+        let test_case_files = expand_input_patterns(&[test_case_pattern.clone()])
+            .context("Failed to expand --create-test pattern")?;
+
+        // Fast path: single test case, no input override — original behavior
+        if test_case_files.len() == 1 && cli.input.is_empty() {
+            return handle_create_test(&test_case_files[0], None, &output);
         }
 
-        let input_files =
-            expand_input_patterns(&cli.input).context("Failed to expand input file patterns")?;
+        let input_files = if cli.input.is_empty() {
+            vec![]
+        } else {
+            expand_input_patterns(&cli.input).context("Failed to expand input file patterns")?
+        };
 
-        if input_files.len() > 1 && !output.is_dir() {
+        // Output must be a directory whenever multiple test cases or multiple inputs are involved
+        if (test_case_files.len() > 1 || input_files.len() > 1) && !output.is_dir() {
             anyhow::bail!(
-                "Output must be a directory when creating test assets from multiple input files. Got: {:?}",
+                "Output must be a directory when creating test assets from multiple test cases or input files. Got: {:?}",
                 output
             );
         }
@@ -182,24 +191,43 @@ pub fn run_cli(cli: Cli, logger: &mut Logger) -> Result<()> {
         let mut success_count = 0u32;
         let mut error_count = 0u32;
 
-        for input_file in &input_files {
-            logger.info(&format!("  📄 Processing: {} ...", input_file.display()));
-            match handle_create_test(test_case_path, Some(input_file), &output) {
-                Ok(_) => {
-                    logger.info("     ✅ Done");
-                    success_count += 1;
+        for test_case_path in &test_case_files {
+            if input_files.is_empty() {
+                logger.info(&format!(
+                    "  📄 Processing test case: {} ...",
+                    test_case_path.display()
+                ));
+                match handle_create_test(test_case_path, None, &output) {
+                    Ok(_) => {
+                        logger.info("     ✅ Done");
+                        success_count += 1;
+                    }
+                    Err(e) => {
+                        logger.error(&format!("     ❌ Error: {e}"));
+                        error_count += 1;
+                    }
                 }
-                Err(e) => {
-                    logger.error(&format!("     ❌ Error: {e}"));
-                    error_count += 1;
+            } else {
+                for input_file in &input_files {
+                    logger.info(&format!("  📄 Processing: {} ...", input_file.display()));
+                    match handle_create_test(test_case_path, Some(input_file), &output) {
+                        Ok(_) => {
+                            logger.info("     ✅ Done");
+                            success_count += 1;
+                        }
+                        Err(e) => {
+                            logger.error(&format!("     ❌ Error: {e}"));
+                            error_count += 1;
+                        }
+                    }
                 }
             }
         }
 
-        if input_files.len() > 1 {
+        let total = success_count + error_count;
+        if total > 1 {
             logger.info(&format!(
-                "\n📊 Test Asset Creation: {success_count} succeeded, {error_count} failed, {} total",
-                input_files.len()
+                "\n📊 Test Asset Creation: {success_count} succeeded, {error_count} failed, {total} total"
             ));
         }
 

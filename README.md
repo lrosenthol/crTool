@@ -86,7 +86,7 @@ The CLI has four distinct modes, plus a batch mode for running multiple commands
 
 | Mode                   | Flag                       | Description                                              |
 | ---------------------- | -------------------------- | -------------------------------------------------------- |
-| **Create test asset**  | `-t, --create-test <FILE>` | Read a test case JSON file and produce a signed asset    |
+| **Create test asset**  | `-t, --create-test <PATTERN>` | Read test case JSON file(s) and produce signed assets |
 | **Extract**            | `-e, --extract`            | Extract C2PA manifest from a signed asset to crJSON      |
 | **Validate**           | `-v, --validate`           | Validate JSON files against the crJSON schema            |
 | **Profile evaluation** | `--profile <FILE>`         | Evaluate crJSON against a YAML asset profile             |
@@ -95,7 +95,7 @@ The CLI has four distinct modes, plus a batch mode for running multiple commands
 ### Options
 
 - `<INPUT_FILE>...`: Path(s) to input media asset(s). Supports glob patterns (e.g., `"*.jpg"`). When used with `--create-test`, the CLI inputs override the `inputAsset` field in the test case JSON, allowing the same test config to be applied to any asset. If the test case JSON has no `inputAsset` and no CLI inputs are provided, an error is returned.
-- `-t, --create-test <FILE>`: Path to a test case JSON file. Reads all signing configuration from the file (see [Test Case JSON Format](#test-case-json-format)).
+- `-t, --create-test <PATTERN>`: Path or glob pattern for test case JSON file(s). Supports glob patterns (e.g., `"test-cases/positive/tc-*.json"`, `"test-cases/**/*.json"`). Reads all signing configuration from each matched file (see [Test Case JSON Format](#test-case-json-format)). When multiple test cases match, `--output` must be a directory.
 - `-o, --output <PATH>`: Output file or directory. Required for `--create-test` and `--extract`. When processing multiple files, must be a directory.
 - `-e, --extract`: Extract C2PA manifest from input file(s) to crJSON.
 - `--trust`: Fetch and apply the official C2PA trust list and Content Credentials interim trust list during extraction. When enabled, output includes `signingCredential.trusted` or `signingCredential.untrusted` in `validationResults`. Requires network access.
@@ -118,6 +118,26 @@ The primary way to create signed C2PA assets is via the `--create-test` flag wit
 ./target/release/crTool \
   --create-test test-cases/positive/tc-created.json \
   --output output/tc-created.jpg
+```
+
+You can also pass a **glob pattern** to process multiple test cases at once. The output must be a directory when multiple test cases match:
+
+```bash
+# Process all positive test cases (each uses its own inputAsset from JSON)
+./target/release/crTool \
+  --create-test "test-cases/positive/tc-*.json" \
+  --output output/
+
+# Process all test cases in any subdirectory
+./target/release/crTool \
+  --create-test "test-cases/**/*.json" \
+  --output output/
+
+# Apply a glob of test cases to a specific input file
+./target/release/crTool \
+  --create-test "test-cases/positive/tc-*.json" \
+  my-image.jpg \
+  --output output/
 ```
 
 ### Test Case JSON Format
@@ -500,6 +520,21 @@ The test certificates in `tests/fixtures/certs/` include `ed25519.pub`/`ed25519.
 ./target/release/crTool \
   --create-test test-cases/positive/tc-created.json \
   testfiles/*.jpg \
+  --output output/
+```
+
+### Process all test cases with a glob pattern
+
+```bash
+# Each test case uses its own inputAsset from the JSON
+./target/release/crTool \
+  --create-test "test-cases/positive/tc-*.json" \
+  --output output/
+
+# Apply all test cases to a specific input file
+./target/release/crTool \
+  --create-test "test-cases/**/*.json" \
+  my-image.jpg \
   --output output/
 ```
 
