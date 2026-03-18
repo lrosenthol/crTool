@@ -101,7 +101,48 @@ fn main() -> Result<()> {
         let output = cli
             .output
             .context("--output is required when using --create-test mode")?;
-        return handle_create_test(test_case_path, &output);
+
+        if cli.input.is_empty() {
+            // No CLI inputs: let handle_create_test use inputAsset from JSON (or error)
+            return handle_create_test(test_case_path, None, &output);
+        }
+
+        // CLI inputs override the JSON inputAsset field
+        let input_files =
+            expand_input_patterns(&cli.input).context("Failed to expand input file patterns")?;
+
+        if input_files.len() > 1 && !output.is_dir() {
+            anyhow::bail!(
+                "Output must be a directory when creating test assets from multiple input files. Got: {:?}",
+                output
+            );
+        }
+
+        let mut success_count = 0;
+        let mut error_count = 0;
+
+        for input_file in &input_files {
+            match handle_create_test(test_case_path, Some(input_file), &output) {
+                Ok(_) => success_count += 1,
+                Err(e) => {
+                    eprintln!("Error processing {:?}: {}", input_file, e);
+                    error_count += 1;
+                }
+            }
+        }
+
+        if input_files.len() > 1 {
+            println!("\n=== Test Asset Creation Summary ===");
+            println!("  Successful: {}", success_count);
+            println!("  Failed: {}", error_count);
+            println!("  Total: {}", input_files.len());
+        }
+
+        if error_count > 0 {
+            anyhow::bail!("{} file(s) failed to create test asset", error_count);
+        }
+
+        return Ok(());
     }
 
     // All other modes require at least one input file

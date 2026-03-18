@@ -33,7 +33,7 @@ docs/schemas/test-case/test-case.schema.json
 | `title` | string | | Short, human-readable title. |
 | `description` | string | | Detailed explanation of what the test case verifies. |
 | `specVersion` | string | | The C2PA Content Credentials specification version targeted by this test case (e.g., `"2.2"`). |
-| `inputAsset` | string | ✅ | Relative path to the raw media asset (image, video, audio, document) into which the manifest will be embedded. |
+| `inputAsset` | string | | Relative path to the raw media asset (image, video, audio, document) into which the manifest will be embedded. Optional — can be omitted when the input file is supplied on the command line. When both are present, the command-line value takes precedence. An error is returned if neither is provided at runtime. |
 | `manifest` | object | ✅ | Manifest declaration/definition in crJSON format. Specifies what content to embed during test asset generation. See [Manifest Object](#manifest-object). |
 | `signingCert` | string | ✅ | Relative path to the PEM-encoded X.509 signing certificate (and chain) used to sign the manifest. |
 | `signingKey` | string | | Relative path to the PEM-encoded private key corresponding to `signingCert`. |
@@ -252,7 +252,7 @@ test-suite/
     └── validator.audio.aiGenerated.untrustedCert.json
 ```
 
-All paths in `inputAsset`, `signingCert`, and `signingKey` are resolved relative to the root of the test suite directory.
+All paths in `inputAsset`, `signingCert`, and `signingKey` are resolved relative to the test case JSON file's directory. `inputAsset` may be omitted from the JSON and supplied instead as a positional argument on the command line, which allows the same test case file to be reused across different input assets.
 
 ---
 

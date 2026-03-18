@@ -167,7 +167,7 @@
       "additionalProperties": false
     }
   },
-  "required": ["testId", "inputAsset", "manifest", "signingCert", "expectedResults"],
+  "required": ["testId", "manifest", "signingCert", "expectedResults"],
   "additionalProperties": false,
   "examples": [
     {

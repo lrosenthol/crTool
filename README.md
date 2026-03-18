@@ -93,7 +93,7 @@ The CLI has four distinct modes:
 
 ### Options
 
-- `<INPUT_FILE>...`: Path(s) to input media asset(s). Supports glob patterns (e.g., `"*.jpg"`). Not required for `--create-test`.
+- `<INPUT_FILE>...`: Path(s) to input media asset(s). Supports glob patterns (e.g., `"*.jpg"`). When used with `--create-test`, the CLI inputs override the `inputAsset` field in the test case JSON, allowing the same test config to be applied to any asset. If the test case JSON has no `inputAsset` and no CLI inputs are provided, an error is returned.
 - `-t, --create-test <FILE>`: Path to a test case JSON file. Reads all signing configuration from the file (see [Test Case JSON Format](#test-case-json-format)).
 - `-o, --output <PATH>`: Output file or directory. Required for `--create-test` and `--extract`. When processing multiple files, must be a directory.
 - `-e, --extract`: Extract C2PA manifest from input file(s) to crJSON.
@@ -163,7 +163,7 @@ Test case files follow the schema defined in `INTERNAL/schemas/test-case.schema.
 | `title` | No | Human-readable title |
 | `description` | No | Description of what the test verifies |
 | `specVersion` | No | C2PA specification version |
-| `inputAsset` | Yes | Path to the input media file (relative to this JSON file) |
+| `inputAsset` | No | Path to the input media file (relative to this JSON file). Can be omitted when an input file is supplied on the command line, which always takes precedence. An error is returned if neither is provided. |
 | `manifest` | Yes | C2PA manifest object. The optional `alg` field sets the signing algorithm; if omitted, the algorithm is auto-detected from `signingCert`. |
 | `signingCert` | Yes | Path to the signing certificate in PEM format (relative to this JSON file) |
 | `signingKey` | No | Path to the private key in PEM format. Defaults to `signingCert` if omitted. |
@@ -425,6 +425,26 @@ The test certificates in `tests/fixtures/certs/` include `ed25519.pub`/`ed25519.
   --output output/tc-created.jpg
 ```
 
+### Create a test asset with a different input (CLI override)
+
+```bash
+# Override the inputAsset in the JSON with a specific file
+./target/release/crTool \
+  --create-test test-cases/positive/tc-created.json \
+  my-custom-image.jpg \
+  --output output/my-custom-image-signed.jpg
+```
+
+### Apply the same test config to multiple files
+
+```bash
+# Output must be a directory when processing multiple inputs
+./target/release/crTool \
+  --create-test test-cases/positive/tc-created.json \
+  testfiles/*.jpg \
+  --output output/
+```
+
 ### Extract a manifest
 
 ```bash
@@ -517,7 +537,7 @@ Ensure you have:
 
 ### "Failed to parse test case JSON" Error
 
-Ensure the test case file matches the schema in `INTERNAL/schemas/test-case.schema.json`. All required fields (`testId`, `inputAsset`, `manifest`, `signingCert`, `expectedResults`) must be present.
+Ensure the test case file matches the schema in `INTERNAL/schemas/test-case.schema.json`. Required fields are `testId`, `manifest`, `signingCert`, and `expectedResults`. `inputAsset` is optional in the JSON but must be supplied on the command line if omitted.
 
 ### "Failed to read C2PA data from input file" Error
 

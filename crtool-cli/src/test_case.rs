@@ -27,7 +27,7 @@ pub struct TestCase {
     pub title: Option<String>,
     #[allow(dead_code)]
     pub description: Option<String>,
-    pub input_asset: String,
+    pub input_asset: Option<String>,
     pub manifest: serde_json::Value,
     pub signing_cert: String,
     pub signing_key: Option<String>,
@@ -37,7 +37,13 @@ pub struct TestCase {
 }
 
 /// Handle the `--create-test` mode: read a test case JSON file and produce a signed asset.
-pub fn handle_create_test(test_case_path: &Path, output: &Path) -> Result<()> {
+/// If `input_override` is provided, it takes precedence over the `inputAsset` field in the
+/// test case JSON. If neither is present, an error is returned.
+pub fn handle_create_test(
+    test_case_path: &Path,
+    input_override: Option<&Path>,
+    output: &Path,
+) -> Result<()> {
     println!(
         "=== Creating test asset from test case: {:?} ===",
         test_case_path
@@ -54,7 +60,17 @@ pub fn handle_create_test(test_case_path: &Path, output: &Path) -> Result<()> {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."));
 
-    let input_asset = base_dir.join(&test_case.input_asset);
+    // CLI input overrides the JSON inputAsset field; error if neither is provided
+    let input_asset = if let Some(override_path) = input_override {
+        override_path.to_path_buf()
+    } else if let Some(ref asset) = test_case.input_asset {
+        base_dir.join(asset)
+    } else {
+        anyhow::bail!(
+            "No input asset specified: the test case JSON does not include 'inputAsset' and \
+            no input file was provided on the command line."
+        )
+    };
     let cert = base_dir.join(&test_case.signing_cert);
     let key = base_dir.join(
         test_case
