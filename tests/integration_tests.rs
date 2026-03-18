@@ -1301,7 +1301,7 @@ fn test_ingredient_missing_file_error() -> Result<()> {
     let manifest_content = r#"{
         "claim_generator_info": [{"name": "test", "version": "1.0.0"}],
         "title": "Test",
-        "ingredients_from_files": [
+        "ingredients": [
             {
                 "title": "Missing",
                 "relationship": "parentOf",

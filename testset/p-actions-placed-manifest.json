@@ -30,7 +30,7 @@
             "created": true
         }
     ],
-    "ingredients_from_files": [
+    "ingredients": [
         {
             "file_path": "test_ingredient_manifest.jpg",
             "label": "test_ingredient",

@@ -92,9 +92,15 @@
         },
         "ingredients": {
           "type": "array",
-          "description": "Array of ingredient objects describing source assets used in producing this asset. Each ingredient may itself carry a manifest.",
+          "description": "Array of ingredient objects describing source assets used in producing this asset. Entries with a 'file_path' field reference external asset files to load as C2PA ingredients; entries without 'file_path' are inline C2PA ingredient definitions passed directly to the manifest builder.",
           "items": {
             "type": "object",
+            "properties": {
+              "file_path": {
+                "type": "string",
+                "description": "Path to an external asset file to load as a C2PA ingredient. When present, the file is read from disk and embedded as an ingredient; the entry is not passed as an inline ingredient definition."
+              }
+            },
             "additionalProperties": true
           }
         },

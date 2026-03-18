@@ -34,7 +34,7 @@
         }
       }
     ],
-    "ingredients_from_files": [
+    "ingredients": [
       {
         "file_path": "../../testset/test_ingredient_manifest.jpg",
         "label": "test_ingredient",

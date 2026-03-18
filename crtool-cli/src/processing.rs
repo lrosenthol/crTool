@@ -137,30 +137,33 @@ fn load_ingredient_from_file(file_path: &Path, generate_thumbnail: bool) -> Resu
     Ok(ingredient)
 }
 
-/// Process `ingredients_from_files` entries from the manifest JSON and add them to the builder.
-/// Returns the number of ingredients processed.
+/// Process file-based ingredient entries from the `ingredients` array in the manifest JSON.
+/// Entries with a `file_path` field are loaded from disk and returned as `Ingredient` objects.
+/// Also returns the manifest JSON with file-based entries stripped from `ingredients`, so the
+/// result is safe to pass to `Builder::from_json` without conflicts.
 pub fn process_ingredients(
-    builder: &mut Builder,
     manifest_json: &str,
     ingredients_base_dir: &Path,
     generate_thumbnails: bool,
-) -> Result<usize> {
-    let manifest: JsonValue =
+) -> Result<(Vec<Ingredient>, String)> {
+    let mut manifest: JsonValue =
         serde_json::from_str(manifest_json).context("Failed to parse manifest JSON")?;
 
-    let mut count = 0;
+    let mut file_ingredients: Vec<Ingredient> = Vec::new();
 
     if let Some(ingredients) = manifest
-        .get("ingredients_from_files")
+        .get("ingredients")
         .and_then(|v| v.as_array())
+        .cloned()
     {
-        for ingredient_def in ingredients {
-            let file_path_str = ingredient_def
-                .get("file_path")
-                .and_then(|v| v.as_str())
-                .context("Ingredient in ingredients_from_files must have a file_path field")?;
+        let mut inline_ingredients = Vec::new();
 
-            count += 1;
+        for ingredient_def in &ingredients {
+            let Some(file_path_str) = ingredient_def.get("file_path").and_then(|v| v.as_str())
+            else {
+                inline_ingredients.push(ingredient_def.clone());
+                continue;
+            };
 
             let file_path = if Path::new(file_path_str).is_absolute() {
                 PathBuf::from(file_path_str)
@@ -210,11 +213,22 @@ pub fn process_ingredients(
                 }
             }
 
-            builder.add_ingredient(ingredient);
+            file_ingredients.push(ingredient);
+        }
+
+        // Replace ingredients array with only the inline (non-file-based) entries
+        if let Some(obj) = manifest.as_object_mut() {
+            obj.insert(
+                "ingredients".to_string(),
+                JsonValue::Array(inline_ingredients),
+            );
         }
     }
 
-    Ok(count)
+    let cleaned_json =
+        serde_json::to_string(&manifest).context("Failed to serialize cleaned manifest JSON")?;
+
+    Ok((file_ingredients, cleaned_json))
 }
 
 /// Parse a signing algorithm name string (case-insensitive) into a `SigningAlg`.
@@ -366,16 +380,17 @@ pub fn process_single_file(
     println!("  Input: {:?}", input_path);
     println!("  Output: {:?}", final_output_path);
 
-    let mut builder = Builder::from_json(config.manifest_json)
+    let (file_ingredients, cleaned_manifest) =
+        process_ingredients(config.manifest_json, config.ingredients_base_dir, false)
+            .context("Failed to process ingredients")?;
+
+    let mut builder = Builder::from_json(&cleaned_manifest)
         .context("Failed to create builder from JSON manifest")?;
 
-    let ingredient_count = process_ingredients(
-        &mut builder,
-        config.manifest_json,
-        config.ingredients_base_dir,
-        false,
-    )
-    .context("Failed to process ingredients")?;
+    let ingredient_count = file_ingredients.len();
+    for ingredient in file_ingredients {
+        builder.add_ingredient(ingredient);
+    }
 
     if ingredient_count > 0 {
         println!("  Processed {} ingredient(s) from files", ingredient_count);

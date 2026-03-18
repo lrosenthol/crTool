@@ -1,7 +1,7 @@
 {
   "testId": "validator.claimSignature.valid.openedWithIngredient",
   "title": "Valid Claim Signature — c2pa.opened with Ingredient",
-  "description": "Verifies that a conformant validator correctly reports a valid claim signature for an asset that was opened from a parent ingredient. The ingredient is a real C2PA-signed JPEG referenced via ingredients_from_files.",
+  "description": "Verifies that a conformant validator correctly reports a valid claim signature for an asset that was opened from a parent ingredient. The ingredient is a real C2PA-signed JPEG referenced via a file_path in the ingredients array.",
   "specVersion": "2.2",
   "inputAsset": "../../testfiles/Dog.jpg",
   "manifest": {
@@ -29,7 +29,7 @@
         }
       }
     ],
-    "ingredients_from_files": [
+    "ingredients": [
       {
         "file_path": "../../testset/test_ingredient_manifest.jpg",
         "label": "test_ingredient",
