@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://c2pa.org/conformance/schemas/test-case/test-case.schema.json",
+  "title": "C2PA Validator Test Case Description Schema",
+  "description": "Describes a single C2PA validator test case for automated conformance assessment. A test case specifies the input asset, the manifest to embed, the signing credentials, an optional Time-Stamping Authority, and the expected validation results.",
+  "type": "object",
+  "properties": {
+    "testId": {
+      "type": "string",
+      "description": "A unique identifier for this test case. SHOULD follow a hierarchical dot-notation convention (e.g., 'validator.claimSignature.valid') to allow grouping and filtering.",
+      "pattern": "^[a-zA-Z0-9_\\-\\.]+$",
+      "examples": [
+        "validator.claimSignature.valid",
+        "validator.hardBindings.mismatch",
+        "validator.signingCredential.untrusted"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "description": "A short, human-readable title for this test case."
+    },
+    "description": {
+      "type": "string",
+      "description": "A detailed human-readable description of what this test case verifies and why it is relevant to conformance."
+    },
+    "specVersion": {
+      "type": "string",
+      "description": "The version of the C2PA Content Credentials specification that this test case targets.",
+      "examples": ["2.2"]
+    },
+    "inputAsset": {
+      "type": "string",
+      "description": "Relative path to the input media asset (e.g., image, video, audio, document) that serves as the base content for this test case. The manifest will be embedded into this asset during test generation."
+    },
+    "manifest": {
+      "type": "object",
+      "description": "The manifest declaration/definition in crJSON format that specifies what C2PA manifest content to embed in the input asset. This follows the c2patool manifest definition format and is used by an automated tool to produce the signed test asset.",
+      "properties": {
+        "alg": {
+          "type": "string",
+          "description": "The signing algorithm to use when producing the claim signature.",
+          "examples": ["Es256", "Es384", "Es512", "Ps256", "Ed25519"]
+        },
+        "claim_generator": {
+          "type": "string",
+          "description": "A string that identifies the software used to generate this manifest (e.g., 'c2patool/0.9.0')."
+        },
+        "claim_generator_info": {
+          "type": "array",
+          "description": "Additional structured information about the claim generator.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the claim generator software."
+              },
+              "version": {
+                "type": "string",
+                "description": "The version of the claim generator software."
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": true
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable title to assign to the manifest and its associated asset."
+        },
+        "format": {
+          "type": "string",
+          "description": "MIME type of the asset (e.g., 'image/jpeg', 'audio/mpeg'). MUST match the format of the file referenced by 'inputAsset'."
+        },
+        "assertions": {
+          "type": "array",
+          "description": "Array of C2PA assertion objects to embed in the manifest. Each assertion has a label identifying its type and a data payload.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "The assertion label identifying the assertion type (e.g., 'c2pa.actions', 'c2pa.hash.data', 'c2pa.thumbnail.claim.jpeg')."
+              },
+              "data": {
+                "description": "The assertion data payload. Its structure depends on the assertion type identified by 'label'."
+              }
+            },
+            "required": ["label", "data"],
+            "additionalProperties": true
+          }
+        },
+        "ingredients": {
+          "type": "array",
+          "description": "Array of ingredient objects describing source assets used in producing this asset. Entries with a 'file_path' field reference external asset files to load as C2PA ingredients; entries without 'file_path' are inline C2PA ingredient definitions passed directly to the manifest builder.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_path": {
+                "type": "string",
+                "description": "Path to an external asset file to load as a C2PA ingredient. When present, the file is read from disk and embedded as an ingredient; the entry is not passed as an inline ingredient definition."
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "credentials": {
+          "type": "array",
+          "description": "Array of W3C Verifiable Credentials to include in the manifest.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "redacted_assertions": {
+          "type": "array",
+          "description": "Array of JUMBF URI labels identifying assertions that should be redacted from this manifest.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "signingCert": {
+      "type": "string",
+      "description": "Relative path to the PEM-encoded X.509 signing certificate (and any required certificate chain) used to sign the manifest. The certificate SHOULD be suitable for C2PA claim signing as described in the C2PA Certificate Policy."
+    },
+    "signingKey": {
+      "type": "string",
+      "description": "Relative path to the PEM-encoded private key that corresponds to the signing certificate. If omitted, the implementation MUST obtain the private key by another means (e.g., from a hardware security module or from the same file as 'signingCert')."
+    },
+    "tsaUrl": {
+      "type": "string",
+      "description": "URL of a RFC 3161-compliant Time-Stamping Authority (TSA) to obtain a signed timestamp for the claim signature. If omitted, no timestamp is requested and the resulting asset will not carry an embedded time-stamp token.",
+      "format": "uri"
+    },
+    "expectedResults": {
+      "type": "object",
+      "description": "The expected validation output from a conformant C2PA validator when processing the test asset produced from this test case definition. Conformance is assessed by comparing actual validator output against these expectations.",
+      "properties": {
+        "validationStatus": {
+          "type": "array",
+          "description": "Expected array of validation status entries based on crJSON validationResults. Each entry specifies a C2PA validation status code that MUST appear in the validator's output for the test to pass.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "A C2PA validation status code (e.g., 'claimSignature.validated', 'signingCredential.untrusted', 'hardBindings.mismatch'). Codes MUST be drawn from the validation status codes defined in the C2PA Content Credentials specification."
+              },
+              "url": {
+                "type": "string",
+                "description": "Optional JUMBF URI fragment that identifies the specific component within the manifest store to which this status applies (e.g., 'self#jumbf=c2pa/urn:uuid:.../c2pa.signature'). When present, the validator's corresponding status entry MUST reference the same logical component, though the exact UUID segment may differ."
+              },
+              "explanation": {
+                "type": "string",
+                "description": "Optional human-readable explanation of why this status code is expected in this test case."
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["validationStatus"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["testId", "manifest", "signingCert", "expectedResults"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "testId": "validator.claimSignature.valid",
+      "title": "Valid Claim Signature",
+      "description": "Verifies that a conformant validator correctly reports a valid claim signature when the asset has not been tampered with and the signing certificate is trusted.",
+      "specVersion": "2.2",
+      "inputAsset": "assets/sample.jpg",
+      "manifest": {
+        "alg": "Es256",
+        "claim_generator": "c2patool/0.9.0",
+        "title": "Sample Test Asset",
+        "format": "image/jpeg",
+        "assertions": [
+          {
+            "label": "c2pa.actions",
+            "data": {
+              "actions": [
+                {
+                  "action": "c2pa.created",
+                  "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "signingCert": "certs/test-signing.pem",
+      "signingKey": "certs/test-signing.key",
+      "tsaUrl": "http://timestamp.digicert.com",
+      "expectedResults": {
+        "validationStatus": [
+          {
+            "code": "claimSignature.validated",
+            "explanation": "The claim signature must be valid for an unmodified, correctly signed asset."
+          }
+        ]
+      }
+    },
+    {
+      "testId": "validator.hardBindings.mismatch",
+      "title": "Hard Binding Mismatch (Asset Tampered)",
+      "description": "Verifies that a conformant validator correctly detects that the asset content has been modified after signing, resulting in a hard binding mismatch.",
+      "specVersion": "2.2",
+      "inputAsset": "assets/tampered-sample.jpg",
+      "manifest": {
+        "alg": "Es256",
+        "claim_generator": "c2patool/0.9.0",
+        "title": "Tampered Test Asset",
+        "format": "image/jpeg",
+        "assertions": [
+          {
+            "label": "c2pa.actions",
+            "data": {
+              "actions": [
+                {
+                  "action": "c2pa.created",
+                  "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "signingCert": "certs/test-signing.pem",
+      "signingKey": "certs/test-signing.key",
+      "expectedResults": {
+        "validationStatus": [
+          {
+            "code": "hardBindings.mismatch",
+            "explanation": "A hard binding mismatch must be reported because the asset content was altered after signing."
+          }
+        ]
+      }
+    }
+  ]
+}

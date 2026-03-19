@@ -164,17 +164,22 @@ pub fn sign_file_with_manifest(
     // Read the manifest JSON
     let manifest_json = fs::read_to_string(manifest_path)?;
 
-    // Create the builder from JSON
-    let mut builder = Builder::from_json(&manifest_json)?;
-
     // Use the manifest's directory as the base for resolving ingredient and resource paths
     let ingredients_base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+
+    // Process file-based ingredients and strip them from the manifest before passing to Builder
+    let (file_ingredients, cleaned_manifest) =
+        process_ingredients_with_thumbnails(&manifest_json, ingredients_base_dir, false)?;
+
+    // Create the builder from the cleaned JSON (file-based entries already removed)
+    let mut builder = Builder::from_json(&cleaned_manifest)?;
 
     // Load any resources (e.g. claim_generator_info icon) referenced by identifier
     add_manifest_resources_from_dir(&mut builder, &manifest_json, ingredients_base_dir)?;
 
-    // Process any ingredients_from_files that may be in the manifest
-    process_ingredients_with_thumbnails(&mut builder, &manifest_json, ingredients_base_dir, false)?;
+    for ingredient in file_ingredients {
+        builder.add_ingredient(ingredient);
+    }
 
     // Use the same test signer approach as c2pa-rs tests
     let signer = test_signer();
@@ -237,20 +242,23 @@ fn sign_file_with_manifest_and_ingredients_impl(
     // Read the manifest JSON
     let manifest_json = fs::read_to_string(manifest_path)?;
 
-    // Create the builder from JSON
-    let mut builder = Builder::from_json(&manifest_json)?;
+    // Process file-based ingredients and strip them from the manifest before passing to Builder
+    let (file_ingredients, cleaned_manifest) = process_ingredients_with_thumbnails(
+        &manifest_json,
+        ingredients_base_dir,
+        generate_ingredient_thumbnails,
+    )?;
+
+    // Create the builder from the cleaned JSON (file-based entries already removed)
+    let mut builder = Builder::from_json(&cleaned_manifest)?;
 
     // Load any resources (e.g. claim_generator_info icon) referenced by identifier
     let manifest_base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
     add_manifest_resources_from_dir(&mut builder, &manifest_json, manifest_base_dir)?;
 
-    // Process ingredients with file paths
-    process_ingredients_with_thumbnails(
-        &mut builder,
-        &manifest_json,
-        ingredients_base_dir,
-        generate_ingredient_thumbnails,
-    )?;
+    for ingredient in file_ingredients {
+        builder.add_ingredient(ingredient);
+    }
 
     // Generate thumbnail for the asset if requested
     if generate_asset_thumbnail {
@@ -280,32 +288,35 @@ fn sign_file_with_manifest_and_ingredients_impl(
     Ok(())
 }
 
-/// Process ingredients from manifest JSON and add them to the builder with optional thumbnails
+/// Process file-based ingredient entries from the `ingredients` array in the manifest JSON.
+/// Entries with a `file_path` field are loaded from disk and returned as `Ingredient` objects.
+/// Also returns the manifest JSON with file-based entries stripped from `ingredients`, so the
+/// result is safe to pass to `Builder::from_json` without conflicts.
 fn process_ingredients_with_thumbnails(
-    builder: &mut Builder,
     manifest_json: &str,
     ingredients_base_dir: &Path,
     generate_thumbnails: bool,
-) -> Result<()> {
+) -> Result<(Vec<Ingredient>, String)> {
     use serde_json::Value as JsonValue;
     use std::io::Seek;
 
-    // Parse the manifest JSON to check for ingredients with file paths
-    let manifest: JsonValue = serde_json::from_str(manifest_json)?;
+    let mut manifest: JsonValue = serde_json::from_str(manifest_json)?;
+    let mut file_ingredients: Vec<Ingredient> = Vec::new();
 
-    // Look for "ingredients_from_files" field
     if let Some(ingredients) = manifest
-        .get("ingredients_from_files")
+        .get("ingredients")
         .and_then(|v| v.as_array())
+        .cloned()
     {
-        for ingredient_def in ingredients {
-            // All entries in ingredients_from_files must have a file_path
-            let file_path_str = ingredient_def
-                .get("file_path")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Missing file_path in ingredient"))?;
+        let mut inline_ingredients = Vec::new();
 
-            // Resolve the file path relative to the base directory
+        for ingredient_def in &ingredients {
+            let Some(file_path_str) = ingredient_def.get("file_path").and_then(|v| v.as_str())
+            else {
+                inline_ingredients.push(ingredient_def.clone());
+                continue;
+            };
+
             let file_path = if Path::new(file_path_str).is_absolute() {
                 PathBuf::from(file_path_str)
             } else {
@@ -316,10 +327,8 @@ fn process_ingredients_with_thumbnails(
                 anyhow::bail!("Ingredient file not found: {:?}", file_path);
             }
 
-            // Load the ingredient file
             let mut source = fs::File::open(&file_path)?;
 
-            // Determine format from file extension
             let extension = file_path
                 .extension()
                 .and_then(|s| s.to_str())
@@ -328,15 +337,12 @@ fn process_ingredients_with_thumbnails(
             let format = extension_to_mime(extension)
                 .ok_or_else(|| anyhow::anyhow!("Unsupported ingredient file format"))?;
 
-            // Create an Ingredient from the file
             let mut ingredient = Ingredient::from_stream(format, &mut source)?;
 
-            // Set the title if provided in the manifest
             if let Some(title) = ingredient_def.get("title").and_then(|v| v.as_str()) {
                 ingredient.set_title(title);
             }
 
-            // Set the relationship if provided
             if let Some(rel) = ingredient_def.get("relationship").and_then(|v| v.as_str()) {
                 let relationship = match rel.to_lowercase().as_str() {
                     "parentof" => Relationship::ParentOf,
@@ -346,43 +352,40 @@ fn process_ingredients_with_thumbnails(
                 ingredient.set_relationship(relationship);
             }
 
-            // Set the label (instance_id) if provided
-            // This allows the ingredient to be referenced in actions by this label
             if let Some(label) = ingredient_def.get("label").and_then(|v| v.as_str()) {
                 ingredient.set_instance_id(label);
             }
 
-            // Set metadata if provided
-            // This supports both standard C2PA AssertionMetadata fields and arbitrary custom fields
             if let Some(metadata_obj) = ingredient_def.get("metadata") {
                 if let Some(metadata_map) = metadata_obj.as_object() {
                     use c2pa::assertions::AssertionMetadata;
                     let mut assertion_metadata = AssertionMetadata::new();
-
-                    // Iterate through all key-value pairs in the metadata object
                     for (key, value) in metadata_map {
-                        // Use set_field to add arbitrary key/value pairs
-                        // This will work for custom fields like "com.adobe.repo.asset-id"
                         assertion_metadata = assertion_metadata.set_field(key, value.clone());
                     }
-
                     ingredient.set_metadata(assertion_metadata);
                 }
             }
 
-            // Generate thumbnail if requested and not already present
             if generate_thumbnails && ingredient.thumbnail_ref().is_none() {
                 source.rewind()?;
                 let (thumb_format, thumbnail) = make_thumbnail_from_stream(format, &mut source)?;
                 ingredient.set_thumbnail(&thumb_format, thumbnail)?;
             }
 
-            // Add the ingredient to the builder
-            builder.add_ingredient(ingredient);
+            file_ingredients.push(ingredient);
+        }
+
+        if let Some(obj) = manifest.as_object_mut() {
+            obj.insert(
+                "ingredients".to_string(),
+                JsonValue::Array(inline_ingredients),
+            );
         }
     }
 
-    Ok(())
+    let cleaned_json = serde_json::to_string(&manifest)?;
+    Ok((file_ingredients, cleaned_json))
 }
 
 /// Converts a file extension to a MIME type

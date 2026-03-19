@@ -284,6 +284,65 @@ fn test_serialize_report_yaml() -> Result<()> {
 }
 
 // ============================================================================
+// Cross-profile compliance tests — missing combinations
+// ============================================================================
+
+/// Human-illustration indicators should not comply with the real-life-capture profile.
+#[test]
+fn test_cross_profile_human_illustration_fails_real_life_capture() -> Result<()> {
+    let report = evaluate_files(
+        profiles_dir().join("real-life-capture_profile.yml"),
+        fixtures_dir().join("human_illustration_indicators.json"),
+    )?;
+
+    assert_eq!(
+        compliance_value(&report),
+        Some(false),
+        "human_illustration_indicators should NOT comply with real-life-capture profile"
+    );
+    println!(
+        "✓ cross-profile: human-illustration indicators correctly fail real-life-capture profile"
+    );
+    Ok(())
+}
+
+/// Human-illustration indicators should not comply with the fully-generative-ai profile.
+#[test]
+fn test_cross_profile_human_illustration_fails_fully_generative_ai() -> Result<()> {
+    let report = evaluate_files(
+        profiles_dir().join("fully-generative-ai_profile.yml"),
+        fixtures_dir().join("human_illustration_indicators.json"),
+    )?;
+
+    assert_eq!(
+        compliance_value(&report),
+        Some(false),
+        "human_illustration_indicators should NOT comply with fully-generative-ai profile"
+    );
+    println!(
+        "✓ cross-profile: human-illustration indicators correctly fail fully-generative-ai profile"
+    );
+    Ok(())
+}
+
+/// Human-illustration profile non-compliant fixture test.
+#[test]
+fn test_human_illustration_profile_non_compliant() -> Result<()> {
+    let report = evaluate_files(
+        profiles_dir().join("human-illustration_profile.yml"),
+        fixtures_dir().join("non_compliant_indicators.json"),
+    )?;
+
+    assert_eq!(
+        compliance_value(&report),
+        Some(false),
+        "non_compliant_indicators should NOT comply with human-illustration profile"
+    );
+    println!("✓ human-illustration profile: non-compliant fixture correctly fails");
+    Ok(())
+}
+
+// ============================================================================
 // CLI integration tests (--profile flag)
 // ============================================================================
 
@@ -373,5 +432,290 @@ fn test_cli_standalone_profile_eval_yaml_output() -> Result<()> {
     );
 
     println!("✓ CLI --profile standalone eval writes YAML report");
+    Ok(())
+}
+
+/// CLI profile eval with non-compliant indicators: should exit 0 (evaluation itself succeeded),
+/// but the written report must record compliance as false.
+#[test]
+fn test_cli_standalone_profile_eval_non_compliant_exits_zero() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let indicators = fixtures_dir().join("non_compliant_indicators.json");
+    let profile = profiles_dir().join("real-life-capture_profile.yml");
+
+    let out_dir = common::output_dir().join("profile_eval_non_compliant");
+    std::fs::create_dir_all(&out_dir)?;
+
+    let indicators_copy = out_dir.join("non_compliant_indicators.json");
+    std::fs::copy(&indicators, &indicators_copy)?;
+
+    let result = Command::new(&binary)
+        .arg("--profile")
+        .arg(&profile)
+        .arg(&indicators_copy)
+        .output()?;
+
+    println!("stdout: {}", String::from_utf8_lossy(&result.stdout));
+    println!("stderr: {}", String::from_utf8_lossy(&result.stderr));
+
+    assert!(
+        result.status.success(),
+        "CLI should exit 0 even for non-compliant content (evaluation ran successfully): {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let report_path = out_dir.join("non_compliant_indicators-report.json");
+    assert!(
+        report_path.exists(),
+        "Report file should be written: {report_path:?}"
+    );
+
+    let content = std::fs::read_to_string(&report_path)?;
+    let parsed: serde_json::Value = serde_json::from_str(&content)?;
+    assert_eq!(
+        compliance_value(&parsed),
+        Some(false),
+        "Non-compliant input must produce compliance=false in the report"
+    );
+
+    println!("✓ CLI --profile non-compliant: exits 0, report has compliance=false");
+    Ok(())
+}
+
+/// CLI profile eval with wrong-profile cross-test: gen-AI indicators against real-life-capture.
+/// Should exit 0 and write a report with compliance=false.
+#[test]
+fn test_cli_standalone_profile_eval_wrong_profile_non_compliant() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let indicators = fixtures_dir().join("generative_ai_indicators.json");
+    let profile = profiles_dir().join("real-life-capture_profile.yml");
+
+    let out_dir = common::output_dir().join("profile_eval_cross");
+    std::fs::create_dir_all(&out_dir)?;
+
+    let indicators_copy = out_dir.join("genai_for_rlc.json");
+    std::fs::copy(&indicators, &indicators_copy)?;
+
+    let result = Command::new(&binary)
+        .arg("--profile")
+        .arg(&profile)
+        .arg(&indicators_copy)
+        .output()?;
+
+    assert!(
+        result.status.success(),
+        "CLI should exit 0 even for cross-profile non-compliance: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let report_path = out_dir.join("genai_for_rlc-report.json");
+    assert!(
+        report_path.exists(),
+        "Report should be written: {report_path:?}"
+    );
+
+    let content = std::fs::read_to_string(&report_path)?;
+    let parsed: serde_json::Value = serde_json::from_str(&content)?;
+    assert_eq!(
+        compliance_value(&parsed),
+        Some(false),
+        "Gen-AI indicators should not comply with real-life-capture profile"
+    );
+
+    println!("✓ CLI --profile cross-profile: exits 0, report has compliance=false");
+    Ok(())
+}
+
+/// CLI profile eval with multiple input files: a separate report should be written for each.
+#[test]
+fn test_cli_standalone_profile_eval_multiple_inputs() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let profile = profiles_dir().join("real-life-capture_profile.yml");
+
+    let out_dir = common::output_dir().join("profile_eval_multi");
+    std::fs::create_dir_all(&out_dir)?;
+
+    // Two indicator files that should both pass the real-life-capture profile
+    let copy1 = out_dir.join("rlc_multi_1.json");
+    let copy2 = out_dir.join("rlc_multi_2.json");
+    std::fs::copy(
+        fixtures_dir().join("real_life_capture_indicators.json"),
+        &copy1,
+    )?;
+    std::fs::copy(
+        fixtures_dir().join("real_life_capture_indicators.json"),
+        &copy2,
+    )?;
+
+    let result = Command::new(&binary)
+        .arg("--profile")
+        .arg(&profile)
+        .arg(&copy1)
+        .arg(&copy2)
+        .output()?;
+
+    println!("stdout: {}", String::from_utf8_lossy(&result.stdout));
+    println!("stderr: {}", String::from_utf8_lossy(&result.stderr));
+
+    assert!(
+        result.status.success(),
+        "Multi-file profile eval should succeed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let report1 = out_dir.join("rlc_multi_1-report.json");
+    let report2 = out_dir.join("rlc_multi_2-report.json");
+    assert!(report1.exists(), "Report 1 should be written: {report1:?}");
+    assert!(report2.exists(), "Report 2 should be written: {report2:?}");
+
+    println!("✓ CLI --profile multi-input: two reports written");
+    Ok(())
+}
+
+/// CLI profile eval with a nonexistent profile file must fail with a non-zero exit code.
+#[test]
+fn test_cli_profile_missing_profile_file_fails() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let indicators = fixtures_dir().join("real_life_capture_indicators.json");
+
+    let out_dir = common::output_dir().join("profile_eval_error");
+    std::fs::create_dir_all(&out_dir)?;
+
+    let indicators_copy = out_dir.join("rlc_indicators_error.json");
+    std::fs::copy(&indicators, &indicators_copy)?;
+
+    let result = Command::new(&binary)
+        .arg("--profile")
+        .arg("/nonexistent/profile.yml")
+        .arg(&indicators_copy)
+        .output()?;
+
+    println!("stderr: {}", String::from_utf8_lossy(&result.stderr));
+
+    assert!(
+        !result.status.success(),
+        "CLI should fail when profile file does not exist"
+    );
+
+    println!("✓ CLI --profile missing profile file: correctly fails");
+    Ok(())
+}
+
+// ============================================================================
+// CLI integration tests — --extract --profile combined mode
+// ============================================================================
+
+/// Use the pre-signed fixture asset: extract its manifest to crJSON and immediately
+/// evaluate it against a profile in a single CLI invocation.
+/// Both the crJSON and the report file must be written.
+#[test]
+fn test_cli_extract_and_profile_combined_json_report() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let signed_asset = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/assets/PXL_20260208_202351558.jpg");
+    let profile = profiles_dir().join("real-life-capture_profile.yml");
+
+    assert!(signed_asset.exists(), "Pre-signed fixture asset must exist");
+
+    let out_dir = common::output_dir().join("extract_and_profile");
+    std::fs::create_dir_all(&out_dir)?;
+
+    let result = Command::new(&binary)
+        .arg("--extract")
+        .arg(&signed_asset)
+        .arg("--output")
+        .arg(&out_dir)
+        .arg("--profile")
+        .arg(&profile)
+        .output()?;
+
+    println!("stdout: {}", String::from_utf8_lossy(&result.stdout));
+    println!("stderr: {}", String::from_utf8_lossy(&result.stderr));
+
+    assert!(
+        result.status.success(),
+        "--extract --profile should succeed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    // Expect crJSON: <stem>_cr.json
+    let crjson_path = out_dir.join("PXL_20260208_202351558_cr.json");
+    assert!(
+        crjson_path.exists(),
+        "crJSON output should be written: {crjson_path:?}"
+    );
+
+    let crjson_content = std::fs::read_to_string(&crjson_path)?;
+    let crjson: serde_json::Value = serde_json::from_str(&crjson_content)?;
+    assert!(
+        crjson.get("manifests").is_some(),
+        "crJSON should have manifests"
+    );
+
+    // Expect report alongside the crJSON: <stem>_cr-report.json
+    let report_path = out_dir.join("PXL_20260208_202351558_cr-report.json");
+    assert!(
+        report_path.exists(),
+        "Profile report should be written: {report_path:?}"
+    );
+
+    let report_content = std::fs::read_to_string(&report_path)?;
+    let report: serde_json::Value = serde_json::from_str(&report_content)?;
+    assert!(
+        report.get("statements").is_some(),
+        "Profile report should have statements"
+    );
+
+    println!("✓ CLI --extract --profile: crJSON and profile report both written");
+    Ok(())
+}
+
+/// --extract --profile with YAML report format.
+#[test]
+fn test_cli_extract_and_profile_combined_yaml_report() -> Result<()> {
+    let binary = common::cli_binary_path();
+    let signed_asset = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/assets/PXL_20260208_202351558.jpg");
+    let profile = profiles_dir().join("real-media_profile.yml");
+
+    assert!(signed_asset.exists(), "Pre-signed fixture asset must exist");
+
+    let out_dir = common::output_dir().join("extract_and_profile_yaml");
+    std::fs::create_dir_all(&out_dir)?;
+
+    let result = Command::new(&binary)
+        .arg("--extract")
+        .arg(&signed_asset)
+        .arg("--output")
+        .arg(&out_dir)
+        .arg("--profile")
+        .arg(&profile)
+        .arg("--report-format")
+        .arg("yaml")
+        .output()?;
+
+    println!("stdout: {}", String::from_utf8_lossy(&result.stdout));
+    println!("stderr: {}", String::from_utf8_lossy(&result.stderr));
+
+    assert!(
+        result.status.success(),
+        "--extract --profile yaml should succeed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let report_path = out_dir.join("PXL_20260208_202351558_cr-report.yaml");
+    assert!(
+        report_path.exists(),
+        "YAML report should be written: {report_path:?}"
+    );
+
+    let content = std::fs::read_to_string(&report_path)?;
+    let parsed: serde_yaml::Value = serde_yaml::from_str(&content)?;
+    assert!(
+        parsed.get("statements").is_some(),
+        "YAML report should have statements"
+    );
+
+    println!("✓ CLI --extract --profile yaml: crJSON and YAML profile report both written");
     Ok(())
 }

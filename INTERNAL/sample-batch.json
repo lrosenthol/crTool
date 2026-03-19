@@ -1,0 +1,34 @@
+[
+    {
+        "command": "profile",
+        "arguments": [
+            "-o",
+            "output/",
+            "--profile",
+            "profile.yaml"
+        ],
+        "inputFiles": [
+            "input.jpg"
+        ]
+    },
+    {
+        "command": "extract",
+        "arguments": [
+            "-o",
+            "output/"
+        ],
+        "inputFiles": [
+            "input.jpg"
+        ]
+    },
+    {
+        "command": "test-cases",
+        "arguments": [
+            "--create-test",
+            "test-cases/positive/tc-created.json"
+        ],
+        "inputFiles": [
+            "input.jpg"
+        ]
+    }
+]

@@ -29,7 +29,7 @@
             }
         }
     ],
-    "ingredients_from_files": [
+    "ingredients": [
         {
             "title": "Background Image",
             "relationship": "parentOf",
