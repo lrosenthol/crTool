@@ -15,18 +15,22 @@ This guide covers one-time setup: prerequisites, cloning, verification, and firs
 
 ### 1. Clone repositories
 
-The project depends on a local copy of c2pa-rs. Clone both as siblings:
+The project depends on three local sibling repositories via path dependencies. Clone all four together:
 
 ```bash
 mkdir c2pa-projects
 cd c2pa-projects
 
 git clone https://github.com/contentauth/c2pa-rs.git
+git clone https://github.com/lrosenthol/json-formula-rs.git
+git clone https://github.com/lrosenthol/profile-evaluator-rs.git
 git clone https://github.com/lrosenthol/crTool.git
 
 # Result:
 # c2pa-projects/
 #   ├── c2pa-rs/
+#   ├── json-formula-rs/
+#   ├── profile-evaluator-rs/
 #   └── crTool/
 ```
 
@@ -75,11 +79,11 @@ For more stable integration tests (avoids occasional file-access races):
 cargo test -- --test-threads=1
 ```
 
-See [TESTING.md](TESTING.md) for test layout and certificates, and [tests/README.md](tests/README.md) for detailed test documentation.
+See [DEVELOPMENT.md](DEVELOPMENT.md#testing) for test layout and certificates, and [tests/README.md](tests/README.md) for detailed test documentation.
 
 ## Generating example certificates
 
-For CLI experimentation, you can create self-signed certificates (see README.md “Generating Test Certificates”). Integration tests use `tests/fixtures/certs/` (see [TESTING.md](TESTING.md)).
+For CLI experimentation, you can create self-signed certificates (see README.md “Generating Test Certificates”). Integration tests use `tests/fixtures/certs/` (see [DEVELOPMENT.md](DEVELOPMENT.md#test-certificates)).
 
 ## Next steps
 

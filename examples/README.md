@@ -27,7 +27,7 @@ A comprehensive manifest with extensive metadata:
 
 Manifests showing composite content from multiple sources:
 - **with_ingredients.json**: Inline ingredient definitions
-- **with_ingredients_from_files.json**: File-based ingredients (`ingredients_from_files`) with paths to source files
+- **with_ingredients_from_files.json**: File-based ingredients (entries with `file_path` in the `ingredients` array) with paths to source files
 - Relationship tracking (parentOf / componentOf)
 
 **Use case**: Creating composite images from multiple source files. See also **simple_with_ingredient.json** for a minimal file-based ingredient example.
