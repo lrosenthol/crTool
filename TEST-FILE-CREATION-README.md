@@ -14,7 +14,7 @@ Test case files drive the `--create-test` mode. They bundle all signing configur
   "title": "Valid Claim Signature — c2pa.created Action",
   "description": "Optional human-readable description of what this test verifies.",
   "specVersion": "2.2",
-  "inputAsset": "../../testfiles/Dog.jpg",
+  "inputAsset": "../../tests/fixtures/assets/Dog.jpg",
   "manifest": {
     "alg": "Ed25519",
     "claim_generator_info": [{ "name": "crTool/0.3.0", "version": "0.3.0" }],
@@ -114,7 +114,7 @@ Add entries with a `file_path` field to the `ingredients` array to load ingredie
   ],
   "ingredients": [
     {
-      "file_path": "../../testfiles/Dog.jpg",
+      "file_path": "../../tests/fixtures/assets/Dog.jpg",
       "label": "source_image",
       "title": "Original Image",
       "relationship": "componentOf"
@@ -154,4 +154,4 @@ test-cases/
     └── tc-n-redacted-bad-reason.json
 ```
 
-All test cases use the Ed25519 test certificates in `tests/fixtures/certs/` and `testfiles/Dog.jpg` as the default input asset.
+All test cases use the Ed25519 test certificates in `tests/fixtures/certs/` and `tests/fixtures/assets/Dog.jpg` as the default input asset.

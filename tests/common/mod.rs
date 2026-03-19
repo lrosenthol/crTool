@@ -51,7 +51,7 @@ pub fn certs_dir() -> PathBuf {
 
 /// Test helper to get the path to test images
 pub fn testfiles_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testfiles")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/assets")
 }
 
 /// Test helper to get the path to manifest examples

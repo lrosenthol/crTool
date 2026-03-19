@@ -39,7 +39,6 @@ crTool/
 │   ├── asset_type_manifest.json
 │   ├── specVersion_manifest.json
 │   └── ...
-├── testfiles/                     # Test images (Dog.jpg, Dog.png, Dog.webp)
 ├── testset/                       # Additional test assets and JSON (GUI/manifest tests)
 ├── tests/
 │   ├── README.md                  # Test suite documentation
@@ -50,7 +49,7 @@ crTool/
 │   │   └── mod.rs                 # Test helpers
 │   └── fixtures/
 │       ├── certs/                # ed25519.pem, ed25519.pub, es256_*
-│       ├── assets/
+│       ├── assets/               # Dog.jpg, Dog.png, Dog.webp
 │       └── *.json                # Validation test fixtures
 ├── INTERNAL/
 │   ├── cddl/                      # CDDL definitions
@@ -96,7 +95,7 @@ crTool/
 
 ### Examples and test data
 - **examples/**: Manifest JSON examples (simple, full, ingredients, actions_v2, etc.).
-- **testfiles/**: Dog.{jpg,png,webp} for integration tests.
+- **tests/fixtures/assets/**: Dog.{jpg,png,webp} for integration tests.
 - **testset/**: Extra test images and JSON for GUI and validation tests.
 
 ### Build and verification
