@@ -28,7 +28,7 @@ Use the included test certs with `--allow-self-signed`:
 ```bash
 ./target/release/crTool \
   --manifest examples/simple_manifest.json \
-  testfiles/Dog.jpg \
+  tests/fixtures/assets/Dog.jpg \
   --output test_signed.jpg \
   --cert tests/fixtures/certs/ed25519.pub \
   --key tests/fixtures/certs/ed25519.pem \

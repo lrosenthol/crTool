@@ -1305,7 +1305,7 @@ fn test_ingredient_missing_file_error() -> Result<()> {
             {
                 "title": "Missing",
                 "relationship": "parentOf",
-                "file_path": "../testfiles/nonexistent.jpg"
+                "file_path": "../tests/fixtures/assets/nonexistent.jpg"
             }
         ]
     }"#;

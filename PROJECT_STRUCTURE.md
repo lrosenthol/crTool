@@ -39,7 +39,6 @@ crTool/
 │   ├── asset_type_manifest.json
 │   ├── specVersion_manifest.json
 │   └── ...
-├── testfiles/                     # Test images (Dog.jpg, Dog.png, Dog.webp)
 ├── testset/                       # Additional test assets and JSON (GUI/manifest tests)
 ├── tests/
 │   ├── README.md                  # Test suite documentation
@@ -50,7 +49,7 @@ crTool/
 │   │   └── mod.rs                 # Test helpers
 │   └── fixtures/
 │       ├── certs/                # ed25519.pem, ed25519.pub, es256_*
-│       ├── assets/
+│       ├── assets/               # Dog.jpg, Dog.png, Dog.webp
 │       └── *.json                # Validation test fixtures
 ├── INTERNAL/
 │   ├── cddl/                      # CDDL definitions
@@ -73,8 +72,8 @@ crTool/
 ├── PROJECT_STRUCTURE.md
 ├── SETUP.md                       # Initial setup and first run
 ├── DEVELOPMENT.md                 # Development workflow and tooling
-├── TESTING.md                     # Integration test details
-├── CONTRIBUTING.md
+├── TESTING.md                     # Redirect → DEVELOPMENT.md#testing and tests/README.md
+├── CONTRIBUTING.md                # Redirect → DEVELOPMENT.md
 ├── LICENSE
 └── rustfmt.toml
 ```
@@ -96,7 +95,7 @@ crTool/
 
 ### Examples and test data
 - **examples/**: Manifest JSON examples (simple, full, ingredients, actions_v2, etc.).
-- **testfiles/**: Dog.{jpg,png,webp} for integration tests.
+- **tests/fixtures/assets/**: Dog.{jpg,png,webp} for integration tests.
 - **testset/**: Extra test images and JSON for GUI and validation tests.
 
 ### Build and verification
@@ -125,10 +124,13 @@ crTool/
 
 ## Documentation Map
 
-- **README.md**: Overview, installation, usage, manifest format, options.
-- **QUICKSTART.md**: Short path to run CLI or GUI and verify.
-- **SETUP.md**: Prerequisites, clone, verify, first build and test.
-- **DEVELOPMENT.md**: Hooks, fmt, clippy, CI, workflow.
-- **TESTING.md**: Integration tests, certs, running and verifying.
-- **crtool-cli/README.md**, **crtool-gui/README.md**: Per-tool details.
-- **Cursor-Docs/README.md**: Index of implementation and historical notes (Cursor-Docs/*.md).
+| Document | Audience | Contents |
+|----------|----------|----------|
+| **README.md** | All | Overview, installation, CLI reference, manifest format, examples |
+| **QUICKSTART.md** | New users | Run the CLI or GUI in minutes |
+| **SETUP.md** | New users | One-time environment setup with verification |
+| **DEVELOPMENT.md** | Contributors | Workflow, code standards, testing, git process, PR guide |
+| **tests/README.md** | Contributors | Full test structure, fixtures, certificates, known issues |
+| **crtool-gui/README.md** | GUI users | GUI features, usage, and platform notes |
+| **examples/README.md** | All | Example manifest files and how to use them |
+| **Cursor-Docs/README.md** | Developers | Index of internal implementation and historical design notes |

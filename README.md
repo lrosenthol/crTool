@@ -1,11 +1,11 @@
 # Content Credential Tool
 
-A Rust-based tool (CLI and GUI) that uses the [c2pa-rs](https://github.com/contentauth/c2pa-rs) library to create and embed C2PA (Coalition for Content Provenance and Authenticity) manifests into media assets.
+A Rust-based tool (CLI and GUI) which leverages the [c2pa-rs](https://github.com/contentauth/c2pa-rs) library to perform a variety of operations on Content Credentials (from the [C2PA](https://c2pa.org)).
 
 ## Tools
 
-- **CLI (`crTool`)**: Command-line tool for creating, embedding, extracting, and validating C2PA manifests (see `crtool-cli/README.md`)
-- **GUI (`crTool-gui`)**: Graphical interface for extracting and validating C2PA manifests (see `crtool-gui/README.md`)
+- **CLI (`crTool`)**: Command-line tool for creating, embedding, extracting, and validating C2PA manifests
+- **GUI (`crTool-gui`)**: Graphical interface for extracting and validating C2PA manifests (see [crtool-gui/README.md](crtool-gui/README.md))
 
 ## Features
 
@@ -18,65 +18,25 @@ A Rust-based tool (CLI and GUI) that uses the [c2pa-rs](https://github.com/conte
 - 📊 **Profile evaluation** — evaluate crJSON against YAML asset profiles
 - ⚡ **Built with Rust** for performance and safety
 
+## Documentation
+
+| Document                                     | When to consult it                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| **This file** (README.md)                    | Complete CLI reference — all options, manifest format, examples, schemas       |
+| [QUICKSTART.md](QUICKSTART.md)               | First time here and want to run the tool in minutes                            |
+| [SETUP.md](SETUP.md)                         | One-time environment setup with verification steps                             |
+| [DEVELOPMENT.md](DEVELOPMENT.md)             | Contributing — workflow, code standards, testing, git process, PR submission   |
+| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Workspace layout, module responsibilities, build artifacts                     |
+| [tests/README.md](tests/README.md)           | Test structure, fixtures, certificates, known issues                           |
+| [crtool-gui/README.md](crtool-gui/README.md) | GUI features, usage, and platform notes                                        |
+| [examples/README.md](examples/README.md)     | Example manifest files and how to use them                                     |
+| [TEST-FILE-CREATION-README.md](TEST-FILE-CREATION-README.md) | Test case JSON schema, manifest format, ingredient fields, test case directory |
+
+---
+
 ## Installation
 
-### Prerequisites
-
-- Rust 1.70 or later
-- C/C++ compiler (required for some dependencies)
-
-### Building from Source
-
-**Important**: This project depends on a local copy of the c2pa-rs library. The `Cargo.toml` references it via a relative path.
-
-```bash
-# Clone both repositories as siblings
-git clone https://github.com/lrosenthol/crTool.git
-git clone https://github.com/contentauth/c2pa-rs.git
-
-# Build the project
-cd crTool
-
-# Install git hooks (recommended for contributors)
-./scripts/install-hooks.sh
-
-# Build
-cargo build --release
-```
-
-The compiled CLI binary will be available at `target/release/crTool`.
-
-### Building the GUI
-
-```bash
-cargo build --release -p crTool      # CLI only
-cargo build --release -p crTool-gui  # GUI only
-
-# Run the GUI
-cargo run --release -p crTool-gui
-```
-
-See [`crtool-gui/README.md`](crtool-gui/README.md) for more details.
-
-**Directory Structure Required:**
-
-```
-parent-directory/
-├── crTool/               (this repository)
-└── c2pa-rs/              (c2pa-rs SDK)
-```
-
-**Note for CI/CD**: The GitHub Actions CI workflow automatically checks out the c2pa-rs repository as a sibling directory.
-
-### For Contributors
-
-The project uses automated code formatting and linting:
-
-- **Pre-commit hooks** check formatting (`cargo fmt`) and linting (`cargo clippy`)
-- Run `./scripts/install-hooks.sh` to install the hooks
-- Run `./scripts/format.sh` to format all code
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow information.
+See [SETUP.md](SETUP.md) for full setup instructions (prerequisites, cloning all sibling repositories, and verification). See [QUICKSTART.md](QUICKSTART.md) to get running in minutes.
 
 ## Usage
 
@@ -84,13 +44,13 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow informati
 
 The CLI has four distinct modes, plus a batch mode for running multiple commands in one go:
 
-| Mode                   | Flag                       | Description                                              |
-| ---------------------- | -------------------------- | -------------------------------------------------------- |
-| **Create test asset**  | `-t, --create-test <PATTERN>` | Read test case JSON file(s) and produce signed assets |
-| **Extract**            | `-e, --extract`            | Extract C2PA manifest from a signed asset to crJSON      |
-| **Validate**           | `-v, --validate`           | Validate JSON files against the crJSON schema            |
-| **Profile evaluation** | `--profile <FILE>`         | Evaluate crJSON against a YAML asset profile             |
-| **Batch**              | `-b, --batch <FILE>`       | Run multiple commands in sequence from a batch JSON file |
+| Mode                   | Flag                          | Description                                              |
+| ---------------------- | ----------------------------- | -------------------------------------------------------- |
+| **Create test asset**  | `-t, --create-test <PATTERN>` | Read test case JSON file(s) and produce signed assets    |
+| **Extract**            | `-e, --extract`               | Extract C2PA manifest from a signed asset to crJSON      |
+| **Validate**           | `-v, --validate`              | Validate JSON files against the crJSON schema            |
+| **Profile evaluation** | `--profile <FILE>`            | Evaluate crJSON against a YAML asset profile             |
+| **Batch**              | `-b, --batch <FILE>`          | Run multiple commands in sequence from a batch JSON file |
 
 ### Options
 
@@ -142,80 +102,7 @@ You can also pass a **glob pattern** to process multiple test cases at once. The
 
 ### Test Case JSON Format
 
-Test case files follow the schema defined in `INTERNAL/schemas/test-case.schema.json`. All file paths in the JSON are resolved relative to the test case file's directory.
-
-```json
-{
-  "testId": "validator.claimSignature.valid.created",
-  "title": "Valid Claim Signature — c2pa.created Action",
-  "description": "Optional human-readable description of what this test verifies.",
-  "specVersion": "2.2",
-  "inputAsset": "../../testfiles/Dog.jpg",
-  "manifest": {
-    "alg": "Ed25519",
-    "claim_generator_info": [{ "name": "crTool/0.3.0", "version": "0.3.0" }],
-    "title": "tc-created",
-    "assertions": [
-      {
-        "label": "c2pa.actions",
-        "data": {
-          "actions": [
-            {
-              "action": "c2pa.created",
-              "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
-              "when": "2026-01-17T14:44:19Z"
-            }
-          ]
-        }
-      }
-    ],
-    "ingredients": []
-  },
-  "signingCert": "../../tests/fixtures/certs/ed25519.pub",
-  "signingKey": "../../tests/fixtures/certs/ed25519.pem",
-  "expectedResults": {
-    "validationStatus": [{ "code": "claimSignature.validated" }]
-  }
-}
-```
-
-**Fields:**
-
-| Field             | Required | Description                                                                                                                                                                                               |
-| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `testId`          | Yes      | Unique identifier for the test case                                                                                                                                                                       |
-| `title`           | No       | Human-readable title                                                                                                                                                                                      |
-| `description`     | No       | Description of what the test verifies                                                                                                                                                                     |
-| `specVersion`     | No       | C2PA specification version                                                                                                                                                                                |
-| `inputAsset`      | No       | Path to the input media file (relative to this JSON file). Can be omitted when an input file is supplied on the command line, which always takes precedence. An error is returned if neither is provided. |
-| `manifest`        | Yes      | C2PA manifest object. The optional `alg` field sets the signing algorithm; if omitted, the algorithm is auto-detected from `signingCert`.                                                                 |
-| `signingCert`     | Yes      | Path to the signing certificate in PEM format (relative to this JSON file)                                                                                                                                |
-| `signingKey`      | No       | Path to the private key in PEM format. Defaults to `signingCert` if omitted.                                                                                                                              |
-| `tsaUrl`          | No       | Timestamp Authority URL                                                                                                                                                                                   |
-| `expectedResults` | Yes      | Expected validation results (used by validators, not the tool itself)                                                                                                                                     |
-
-**Algorithm auto-detection:** If `manifest.alg` is absent, the tool examines `signingCert` to determine the algorithm automatically (ES256/ES384/ES512 from ECDSA curve, Ed25519 from Ed25519 key, PS256 from RSA key).
-
-### Test Cases Directory
-
-The `test-cases/` directory contains pre-built test case files organized by conformance intent:
-
-```
-test-cases/
-├── positive/             # Conformant assets — expect claimSignature.validated
-│   ├── tc-created.json
-│   ├── tc-changes-spatial.json
-│   ├── tc-placed-with-ingredient.json
-│   └── tc-opened-with-ingredient.json
-└── negative/             # Non-conformant assets — validly signed but profile-violating
-    ├── tc-n-created-nodst.json
-    ├── tc-n-removed.json
-    ├── tc-n-inception.json
-    ├── tc-n-placed-empty-params.json
-    └── tc-n-redacted-bad-reason.json
-```
-
-All test cases use the Ed25519 test certificates in `tests/fixtures/certs/` and `testfiles/Dog.jpg` as the input asset.
+See [TEST-FILE-CREATION-README.md](TEST-FILE-CREATION-README.md) for the full test case schema, field reference, manifest format, ingredient configuration, and the pre-built test cases directory layout.
 
 ---
 
@@ -314,19 +201,30 @@ Validating: "invalid_manifest.json"
 
 ## Profile Evaluation
 
-Evaluate a crJSON file against a YAML asset profile using `--profile`. The profile report is written alongside the input file.
+Evaluate a crJSON file against a YAML asset profile using `--profile`. Profiles are YAML documents that define a set of statements — each statement uses a [json-formula](https://opensource.adobe.com/json-formula/) expression to query the crJSON and produce a boolean outcome and localized report text. The evaluation is performed by the [profile-evaluator-rs](https://github.com/lrosenthol/profile-evaluator-rs) library, which in turn uses [json-formula-rs](https://github.com/lrosenthol/json-formula-rs) as its expression engine.
+
+The `profiles/` directory contains built-in profiles:
+
+| Profile                           | Description                                    |
+| --------------------------------- | ---------------------------------------------- |
+| `human-illustration_profile.yml`  | Human-created illustration (no AI generation)  |
+| `real-life-capture_profile.yml`   | Real-world captured content (camera or device) |
+| `real-media_profile.yml`          | Real media with authentic provenance           |
+| `fully-generative-ai_profile.yml` | Fully AI-generated content                     |
+
+The profile report is written alongside the input file as `<stem>-report.json` (or `.yaml` with `--report-format yaml`).
 
 ```bash
 # Standalone: evaluate existing crJSON files
 ./target/release/crTool \
   my_manifest_cr.json \
-  --profile profiles/photojournalism.yaml
+  --profile profiles/human-illustration_profile.yml
 
-# Combined with extract: extract then evaluate
+# Combined with extract: extract then evaluate in one step
 ./target/release/crTool \
   -e signed_image.jpg \
   --output output/ \
-  --profile profiles/photojournalism.yaml \
+  --profile profiles/human-illustration_profile.yml \
   --report-format yaml
 ```
 
@@ -385,97 +283,9 @@ The `command` field sets the mode. For `extract` and `validate`, the correspondi
 
 ---
 
-## Manifest JSON Format
-
-The `manifest` object inside a test case file follows the c2pa-rs JSON manifest format:
-
-```json
-{
-  "alg": "Ed25519",
-  "claim_generator_info": [{ "name": "my-app/1.0.0", "version": "1.0.0" }],
-  "title": "My Asset",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.edited",
-            "when": "2024-01-07T12:00:00Z",
-            "softwareAgent": "MyApp 1.0"
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients": []
-}
-```
-
-### Using File-Based Ingredients
-
-Add `ingredients_from_files` to the manifest object to load ingredient assets from files. Paths are resolved relative to the test case JSON file's directory.
-
-```json
-{
-  "alg": "Ed25519",
-  "claim_generator_info": [{ "name": "my-app/1.0.0", "version": "1.0.0" }],
-  "title": "Edited Photo",
-  "assertions": [
-    {
-      "label": "c2pa.actions",
-      "data": {
-        "actions": [
-          {
-            "action": "c2pa.placed",
-            "when": "2024-01-07T12:00:00Z",
-            "parameters": { "ingredientIds": ["source_image"] }
-          }
-        ]
-      }
-    }
-  ],
-  "ingredients_from_files": [
-    {
-      "file_path": "../../testfiles/Dog.jpg",
-      "label": "source_image",
-      "title": "Original Image",
-      "relationship": "componentOf"
-    }
-  ]
-}
-```
-
-Each ingredient entry supports:
-
-- **`file_path`** (required): Path to the ingredient file
-- **`title`**: Human-readable title
-- **`relationship`**: `"parentOf"` or `"componentOf"`
-- **`label`**: Instance ID for referencing in actions via `ingredientIds`
-- **`metadata`**: Custom key/value metadata fields
-
----
-
 ## Supported File Formats
 
 `avi`, `avif`, `c2pa`, `dng`, `gif`, `heic`, `heif`, `jpg`/`jpeg`, `m4a`, `mov`, `mp3`, `mp4`, `pdf`, `png`, `svg`, `tiff`, `wav`, `webp`
-
----
-
-## Architecture
-
-The CLI (`crtool-cli`) is split into focused source modules:
-
-| Module          | Responsibility                                                                  |
-| --------------- | ------------------------------------------------------------------------------- |
-| `main.rs`       | CLI argument parsing (`clap`), `Logger`, mode dispatch, `run_cli`               |
-| `batch.rs`      | Batch file parsing and sequential command execution (`--batch`)                 |
-| `processing.rs` | C2PA manifest signing, ingredient loading, algorithm detection                  |
-| `test_case.rs`  | Test case JSON deserialization, `--create-test` mode                            |
-| `extraction.rs` | Manifest extraction, crJSON output, JSON schema validation, trust list fetching |
-| `profile.rs`    | Profile evaluation, report serialization                                        |
-
-The core library (`crtool`) provides manifest extraction/validation logic and schema paths shared between the CLI and GUI.
 
 ---
 
@@ -519,7 +329,7 @@ The test certificates in `tests/fixtures/certs/` include `ed25519.pub`/`ed25519.
 # Output must be a directory when processing multiple inputs
 ./target/release/crTool \
   --create-test test-cases/positive/tc-created.json \
-  testfiles/*.jpg \
+  tests/fixtures/assets/*.jpg \
   --output output/
 ```
 
@@ -587,7 +397,9 @@ The tool provides detailed error messages for common issues:
 
 Key dependencies:
 
-- [c2pa](https://crates.io/crates/c2pa) — C2PA manifest creation and signing
+- [c2pa](https://crates.io/crates/c2pa) — C2PA manifest creation and signing (local path: `../c2pa-rs/sdk`)
+- [profile-evaluator-rs](https://github.com/lrosenthol/profile-evaluator-rs) — YAML asset profile evaluation (local path: `../profile-evaluator-rs`)
+- [json-formula-rs](https://github.com/lrosenthol/json-formula-rs) — [json-formula](https://opensource.adobe.com/json-formula/) expression engine used by the profile evaluator (local path: `../json-formula-rs`)
 - [clap](https://crates.io/crates/clap) — Command-line argument parsing
 - [serde](https://crates.io/crates/serde) & [serde_json](https://crates.io/crates/serde_json) — JSON handling
 - [jsonschema](https://crates.io/crates/jsonschema) — JSON Schema validation
@@ -601,16 +413,7 @@ Apache License 2.0 — See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-**Before contributing:**
-
-1. Install git hooks: `./scripts/install-hooks.sh`
-2. Ensure code is formatted: `cargo fmt`
-3. Ensure clippy passes: `cargo clippy -- -D warnings`
-4. Run tests: `cargo test`
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow and best practices.
+Contributions are welcome! See [DEVELOPMENT.md](DEVELOPMENT.md) for the full guide: setup, code standards, git workflow, and how to submit a pull request.
 
 ## Resources
 
@@ -627,7 +430,7 @@ Ensure you have:
 1. The latest Rust toolchain (`rustup update`)
 2. Required system libraries (OpenSSL, etc.)
 3. A C/C++ compiler installed
-4. The `c2pa-rs` repository cloned as a sibling directory
+4. All sibling repositories cloned: `c2pa-rs`, `profile-evaluator-rs`, and `json-formula-rs`
 
 ### "Failed to parse test case JSON" Error
 

@@ -27,7 +27,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "testfiles/Dog.jpg"
+                "tests/fixtures/assets/Dog.jpg"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -56,7 +56,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "testfiles/Dog.png"
+                "tests/fixtures/assets/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -85,7 +85,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "testfiles/Dog.png"
+                "tests/fixtures/assets/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -202,7 +202,7 @@
             "args": [
                 "-m",
                 "testset/p-actions-created.json",
-                "testfiles/Dog.png",
+                "tests/fixtures/assets/Dog.png",
                 "-o",
                 "target/output/p-actions-created.png",
                 "-c",
