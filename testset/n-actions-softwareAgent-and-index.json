@@ -2,7 +2,8 @@
     "claim_generator_info": [
         {
             "name": "crTool/0.1.0",
-            "version": "0.1.0"
+            "version": "0.1.0",
+            "specVersion": "2.3.0"
         }
     ],
     "title": "p-actions-softwareAgents",
