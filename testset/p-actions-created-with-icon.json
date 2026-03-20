@@ -6,7 +6,8 @@
             "icon": {
                 "format": "image/svg+xml",
                 "identifier": "logo.svg"
-            }
+            },
+            "specVersion": "2.3.0"
         }
     ],
     "title": "p-actions-created-with-icon",
