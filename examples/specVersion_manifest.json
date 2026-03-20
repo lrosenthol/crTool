@@ -2,7 +2,7 @@
     "specVersion": "2.2.0",
     "claim_generator_info": [
         {
-            "name": "crTool/0.1.0",
+            "name": "crTool",
             "version": "0.1.0"
         }
     ],
