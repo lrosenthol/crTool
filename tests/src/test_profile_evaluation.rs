@@ -25,7 +25,7 @@ fn profiles_dir() -> PathBuf {
 }
 
 fn fixtures_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/jsons")
 }
 
 /// Find the compliance statement in the report and return its boolean value.
@@ -612,7 +612,7 @@ fn test_cli_profile_missing_profile_file_fails() -> Result<()> {
 fn test_cli_extract_and_profile_combined_json_report() -> Result<()> {
     let binary = common::cli_binary_path();
     let signed_asset = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/assets/PXL_20260208_202351558.jpg");
+        .join("tests/fixtures/assets/signed/PXL_20260208_202351558.jpg");
     let profile = profiles_dir().join("real-life-capture_profile.yml");
 
     assert!(signed_asset.exists(), "Pre-signed fixture asset must exist");
@@ -675,7 +675,7 @@ fn test_cli_extract_and_profile_combined_json_report() -> Result<()> {
 fn test_cli_extract_and_profile_combined_yaml_report() -> Result<()> {
     let binary = common::cli_binary_path();
     let signed_asset = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/assets/PXL_20260208_202351558.jpg");
+        .join("tests/fixtures/assets/signed/PXL_20260208_202351558.jpg");
     let profile = profiles_dir().join("real-media_profile.yml");
 
     assert!(signed_asset.exists(), "Pre-signed fixture asset must exist");

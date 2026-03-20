@@ -1,9 +1,0 @@
-{
-  "@context": ["https://contentcredentials.org/crjson/context/v1"],
-  "manifests": [],
-  "jsonGenerator": {
-    "name": "crTool",
-    "version": "0.3.0",
-    "date": "2025-01-01T00:00:00Z"
-  }
-}

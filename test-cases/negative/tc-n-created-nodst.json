@@ -3,7 +3,7 @@
   "title": "Profile Violation — c2pa.created Missing digitalSourceType",
   "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest where the c2pa.created action is missing the required digitalSourceType field. The signature itself is valid; the non-conformance is a profile-level violation that a profile-aware validator MUST flag separately.",
   "specVersion": "2.2",
-  "inputAsset": "../../tests/fixtures/assets/Dog.jpg",
+  "inputAsset": "../../tests/fixtures/assets/raw/Dog.jpg",
   "manifest": {
     "alg": "Ed25519",
     "claim_generator_info": [

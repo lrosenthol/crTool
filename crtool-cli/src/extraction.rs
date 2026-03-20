@@ -96,7 +96,7 @@ pub fn extract_manifest(
         if let Some(obj) = json_value.as_object_mut() {
             obj.insert(
                 "@context".to_string(),
-                serde_json::json!(["https://contentcredentials.org/crjson/context/v1"]),
+                serde_json::json!(["https://c2pa.org/crjson/context/v1"]),
             );
         }
     }

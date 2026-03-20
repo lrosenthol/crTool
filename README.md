@@ -329,7 +329,7 @@ The test certificates in `tests/fixtures/certs/` include `ed25519.pub`/`ed25519.
 # Output must be a directory when processing multiple inputs
 ./target/release/crTool \
   --create-test test-cases/positive/tc-created.json \
-  tests/fixtures/assets/*.jpg \
+  tests/fixtures/assets/raw/*.jpg \
   --output output/
 ```
 

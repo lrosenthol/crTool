@@ -32,7 +32,7 @@ cargo test test_dog_png
 
 ## Test Structure
 
-### Integration Tests (`tests/integration_tests.rs`)
+### Integration Tests (`tests/src/integration_tests.rs`)
 
 - ✅ `test_dog_jpg_simple_manifest` - Embeds simple manifest into Dog.jpg
 - ✅ `test_dog_jpg_full_manifest` - Embeds full manifest into Dog.jpg
@@ -42,7 +42,7 @@ cargo test test_dog_png
 - ✅ `test_dog_webp_full_manifest` - Embeds full manifest into Dog.webp
 - ✅ `test_all_images_both_manifests` - Batch test of all combinations
 
-### Helper Tests (`tests/common/mod.rs::tests`)
+### Helper Tests (`tests/src/common/mod.rs::tests`)
 
 - ✅ `test_fixtures_exist` - Verifies test directory structure
 - ✅ `test_images_exist` - Verifies all test images are present

@@ -25,7 +25,7 @@
         {
             "title": "Original Image",
             "relationship": "componentOf",
-            "file_path": "../tests/fixtures/assets/Dog.jpg"
+            "file_path": "../tests/fixtures/assets/raw/Dog.jpg"
         }
     ]
 }

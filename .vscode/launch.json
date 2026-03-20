@@ -27,7 +27,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "tests/fixtures/assets/Dog.jpg"
+                "tests/fixtures/assets/raw/Dog.jpg"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -56,7 +56,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "tests/fixtures/assets/Dog.png"
+                "tests/fixtures/assets/raw/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -85,7 +85,7 @@
                 "-k",
                 "tests/fixtures/certs/ed25519.pem",
                 "--allow-self-signed",
-                "tests/fixtures/assets/Dog.png"
+                "tests/fixtures/assets/raw/Dog.png"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -132,7 +132,7 @@
                 "profiles/real-life-capture_profile.yml",
                 "--report-format",
                 "json",
-                "tests/fixtures/real_life_capture_indicators.json"
+                "tests/fixtures/jsons/real_life_capture_indicators.json"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -157,7 +157,7 @@
                 "profiles/real-life-capture_profile.yml",
                 "--report-format",
                 "json",
-                "tests/fixtures/assets/PXL_20260208_202351558.jpg",
+                "tests/fixtures/assets/signed/PXL_20260208_202351558.jpg",
                 "-o",
                 "target/output/PXL_20260208_202351558_output.json"
             ],
@@ -180,7 +180,7 @@
             },
             "args": [
                 "--validate",
-                "tests/fixtures/minimal_valid_crjson.json"
+                "tests/fixtures/jsons/minimal_valid_crjson.json"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -202,7 +202,7 @@
             "args": [
                 "-m",
                 "testset/p-actions-created.json",
-                "tests/fixtures/assets/Dog.png",
+                "tests/fixtures/assets/raw/Dog.png",
                 "-o",
                 "target/output/p-actions-created.png",
                 "-c",

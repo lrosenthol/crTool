@@ -3,7 +3,7 @@
   "title": "Valid Claim Signature — c2pa.placed with Ingredient",
   "description": "Verifies that a conformant validator correctly reports a valid claim signature for an asset that was produced by placing a component ingredient. The ingredient is a real C2PA-signed JPEG; its manifest is embedded as a parentOf ingredient.",
   "specVersion": "2.2",
-  "inputAsset": "../../tests/fixtures/assets/Dog.jpg",
+  "inputAsset": "../../tests/fixtures/assets/raw/Dog.jpg",
   "manifest": {
     "alg": "Ed25519",
     "claim_generator_info": [

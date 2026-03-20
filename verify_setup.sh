@@ -28,8 +28,8 @@ echo "  Found c2pa-rs SDK at ../c2pa-rs/sdk"
 # Check test files exist
 echo ""
 echo "✓ Checking test files..."
-if [ ! -f "tests/fixtures/assets/Dog.jpg" ] || [ ! -f "tests/fixtures/assets/Dog.png" ] || [ ! -f "tests/fixtures/assets/Dog.webp" ]; then
-    echo "❌ Test image files missing in tests/fixtures/assets/"
+if [ ! -f "tests/fixtures/assets/raw/Dog.jpg" ] || [ ! -f "tests/fixtures/assets/raw/Dog.png" ] || [ ! -f "tests/fixtures/assets/raw/Dog.webp" ]; then
+    echo "❌ Test image files missing in tests/fixtures/assets/raw/"
     exit 1
 fi
 echo "  All test images present"

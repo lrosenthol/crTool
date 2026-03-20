@@ -70,7 +70,8 @@ Exposes: `extract_crjson_manifest()`, `validate_json_file()`, `validate_json_val
 
 ### Schemas & Test Assets
 - **`INTERNAL/schemas/`** — `crJSON-schema.json`, `test-case.schema.json`, `batch.schema.json`
-- **`tests/fixtures/assets/`** — Sample media files (Dog.jpg, Dog.png, Dog.webp)
+- **`tests/fixtures/assets/raw/`** — Unsigned sample media files (Dog.jpg, Dog.png, Dog.webp)
+- **`tests/fixtures/assets/signed/`** — Pre-signed sample media files (PXL_20260208_202351558.jpg)
 - **`test-cases/`** — Positive and negative test cases (JSON)
 - **`tests/fixtures/certs/`** — Test certificates (ed25519.pem, es256_*.pem)
 

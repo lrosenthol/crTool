@@ -49,9 +49,14 @@ pub fn certs_dir() -> PathBuf {
     fixtures_dir().join("certs")
 }
 
-/// Test helper to get the path to test images
+/// Test helper to get the path to raw (unsigned) test images
 pub fn testfiles_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/assets")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/assets/raw")
+}
+
+/// Test helper to get the path to pre-signed test assets
+pub fn signed_assets_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/assets/signed")
 }
 
 /// Test helper to get the path to manifest examples
@@ -437,8 +442,8 @@ fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(St
 /// Create a test signer using Ed25519 (same as c2pa-rs test infrastructure)
 /// This uses the Ed25519 certificates from c2pa-rs which pass all validation
 fn test_signer() -> CallbackSigner {
-    const CERTS: &[u8] = include_bytes!("../fixtures/certs/ed25519.pub");
-    const PRIVATE_KEY: &[u8] = include_bytes!("../fixtures/certs/ed25519.pem");
+    const CERTS: &[u8] = include_bytes!("../../fixtures/certs/ed25519.pub");
+    const PRIVATE_KEY: &[u8] = include_bytes!("../../fixtures/certs/ed25519.pem");
 
     let ed_signer = |_context: *const (), data: &[u8]| ed_sign(data, PRIVATE_KEY);
     CallbackSigner::new(ed_signer, SigningAlg::Ed25519, CERTS)

@@ -42,15 +42,20 @@ crTool/
 ├── testset/                       # Additional test assets and JSON (GUI/manifest tests)
 ├── tests/
 │   ├── README.md                  # Test suite documentation
-│   ├── integration_tests.rs       # Sign + verify integration tests
-│   ├── test_crjson_extraction.rs
-│   ├── test_validation.rs
-│   ├── common/
-│   │   └── mod.rs                 # Test helpers
+│   ├── src/
+│   │   ├── integration_tests.rs   # Sign + verify integration tests
+│   │   ├── test_create_test_cli.rs
+│   │   ├── test_crjson_extraction.rs
+│   │   ├── test_profile_evaluation.rs
+│   │   ├── test_validation.rs
+│   │   └── common/
+│   │       └── mod.rs             # Test helpers
 │   └── fixtures/
 │       ├── certs/                # ed25519.pem, ed25519.pub, es256_*
-│       ├── assets/               # Dog.jpg, Dog.png, Dog.webp
-│       └── *.json                # Validation test fixtures
+│       ├── assets/
+│       │   ├── raw/              # Dog.jpg, Dog.png, Dog.webp (unsigned)
+│       │   └── signed/           # PXL_20260208_202351558.jpg (pre-signed)
+│       └── jsons/                # Validation test fixtures (*.json)
 ├── INTERNAL/
 │   ├── cddl/                      # CDDL definitions
 │   └── schemas/
@@ -95,7 +100,8 @@ crTool/
 
 ### Examples and test data
 - **examples/**: Manifest JSON examples (simple, full, ingredients, actions_v2, etc.).
-- **tests/fixtures/assets/**: Dog.{jpg,png,webp} for integration tests.
+- **tests/fixtures/assets/raw/**: Dog.{jpg,png,webp} unsigned images for signing integration tests.
+- **tests/fixtures/assets/signed/**: PXL_20260208_202351558.jpg pre-signed asset for extraction/trust tests.
 - **testset/**: Extra test images and JSON for GUI and validation tests.
 
 ### Build and verification

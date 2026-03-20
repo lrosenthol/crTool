@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://contentcredentials.org/crjson/crJSON-schema.json",
+    "$id": "https://c2pa.org/crjson/crJSON-schema.json",
     "title": "Content Credential JSON (CrJSON) Document Schema",
     "description": "JSON Schema for Content Credential JSON (CrJSON) documents. CrJSON does not include asset_info, content, or metadata.",
     "type": "object",

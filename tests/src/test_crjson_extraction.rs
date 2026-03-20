@@ -19,7 +19,9 @@ use std::process::Command;
 
 mod common;
 
-use common::{fixtures_dir, manifests_dir, output_dir, sign_file_with_manifest, testfiles_dir};
+use common::{
+    manifests_dir, output_dir, sign_file_with_manifest, signed_assets_dir, testfiles_dir,
+};
 
 fn generate_extraction_output(input: &str, subdir: &str) -> PathBuf {
     let dir = output_dir().join(subdir);
@@ -370,13 +372,13 @@ fn test_crjson_output_to_directory() -> Result<()> {
 
 /// Asset signed with a certificate on the C2PA/Content Credentials trust lists;
 /// extraction with --trust should report signingCredential.trusted.
-const TRUSTED_ASSET: &str = "assets/PXL_20260208_202351558.jpg";
+const TRUSTED_ASSET: &str = "PXL_20260208_202351558.jpg";
 
 /// Extracts crJSON with --trust and asserts the active manifest is reported as trusted.
 /// Requires network to fetch trust lists on first run.
 #[test]
 fn test_extract_crjson_with_trust_reports_trusted() -> Result<()> {
-    let input = fixtures_dir().join(TRUSTED_ASSET);
+    let input = signed_assets_dir().join(TRUSTED_ASSET);
     if !input.exists() {
         eprintln!("Skipping: fixture {} not found", input.display());
         return Ok(());

@@ -33,12 +33,12 @@
         {
             "title": "Background Image",
             "relationship": "parentOf",
-            "file_path": "../tests/fixtures/assets/Dog.jpg"
+            "file_path": "../tests/fixtures/assets/raw/Dog.jpg"
         },
         {
             "title": "Secondary Element",
             "relationship": "componentOf",
-            "file_path": "../tests/fixtures/assets/Dog.png"
+            "file_path": "../tests/fixtures/assets/raw/Dog.png"
         }
     ]
 }

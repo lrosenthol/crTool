@@ -3,7 +3,7 @@
   "title": "Profile Violation — c2pa.placed with Empty parameters (Missing ingredientIds)",
   "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest where the c2pa.placed action has an empty parameters object, omitting the required ingredientIds field. A profile-aware validator MUST report this as a non-conformance.",
   "specVersion": "2.2",
-  "inputAsset": "../../tests/fixtures/assets/Dog.jpg",
+  "inputAsset": "../../tests/fixtures/assets/raw/Dog.jpg",
   "manifest": {
     "alg": "Ed25519",
     "claim_generator_info": [

@@ -3,7 +3,7 @@
   "title": "Profile Violation — c2pa.removed Action",
   "description": "Verifies that a conformant validator correctly reports a valid claim signature for a manifest that includes a c2pa.removed action, which is not a valid C2PA action type. The signature is valid; the non-conformance is detected at the profile evaluation level.",
   "specVersion": "2.2",
-  "inputAsset": "../../tests/fixtures/assets/Dog.jpg",
+  "inputAsset": "../../tests/fixtures/assets/raw/Dog.jpg",
   "manifest": {
     "alg": "Ed25519",
     "claim_generator_info": [

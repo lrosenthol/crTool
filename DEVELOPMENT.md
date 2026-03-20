@@ -132,10 +132,10 @@ Successful integration tests write signed images to `target/test_output/` (e.g. 
 
 ### Test Layout
 
-- **`tests/integration_tests.rs`** — Sign test images (Dog.jpg, Dog.png, Dog.webp) with various manifests, verify output
-- **`tests/test_crjson_extraction.rs`** — Manifest extraction and crJSON output
-- **`tests/test_validation.rs`** — Schema validation
-- **`tests/common/mod.rs`** — Shared helpers and fixture checks
+- **`tests/src/integration_tests.rs`** — Sign test images (Dog.jpg, Dog.png, Dog.webp) with various manifests, verify output
+- **`tests/src/test_crjson_extraction.rs`** — Manifest extraction and crJSON output
+- **`tests/src/test_validation.rs`** — Schema validation
+- **`tests/src/common/mod.rs`** — Shared helpers and fixture checks
 
 For full test documentation see [tests/README.md](tests/README.md).
 

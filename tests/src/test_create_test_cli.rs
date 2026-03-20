@@ -84,7 +84,7 @@ fn test_create_test_single_exact_path() -> Result<()> {
 #[test]
 fn test_create_test_with_cli_input_override() -> Result<()> {
     let tc = test_cases_dir().join("positive/tc-created.json");
-    let input = repo_root().join("tests/fixtures/assets/Dog.jpg");
+    let input = repo_root().join("tests/fixtures/assets/raw/Dog.jpg");
     let out = test_output_dir("input_override").join("tc-created-override.jpg");
 
     assert!(input.exists(), "Input file must exist: {input:?}");
@@ -153,7 +153,7 @@ fn test_create_test_glob_with_input_override() -> Result<()> {
         "{}/test-cases/positive/tc-created*.json",
         repo_root().display()
     );
-    let input = repo_root().join("tests/fixtures/assets/Dog.jpg");
+    let input = repo_root().join("tests/fixtures/assets/raw/Dog.jpg");
     let out_dir = test_output_dir("glob_with_input");
 
     assert!(input.exists(), "Input file must exist: {input:?}");
@@ -332,7 +332,7 @@ fn test_batch_test_cases_glob_pattern() -> Result<()> {
 #[test]
 fn test_batch_test_cases_with_input_files() -> Result<()> {
     let tc = test_cases_dir().join("positive/tc-created.json");
-    let input = repo_root().join("tests/fixtures/assets/Dog.jpg");
+    let input = repo_root().join("tests/fixtures/assets/raw/Dog.jpg");
     let out_dir = test_output_dir("batch_with_input");
     let batch_out_dir = out_dir.join("output");
     fs::create_dir_all(&batch_out_dir)?;
